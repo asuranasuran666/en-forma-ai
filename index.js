@@ -1,26 +1,70 @@
 require('dotenv').config();
 const express = require('express');
-const session = require('express-session');
 const { createClient } = require('@supabase/supabase-js');
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 const app = express();
 
 const PORT = process.env.PORT || 3000;
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://enqbfcrpsqgslmckvswo.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_KEY || 'sb_publishable_FB4_GaqMpK2AVvvG2Xtx_w_70rjqq5W';
+const GROQ_API_KEY = process.env.GROQ_API_KEY || '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';
 
 app.use(express.urlencoded({ extended: true }));
-app.use(session({
-    secret: process.env.SESSION_SECRET || 'secreto-en-forma-ai-pro',
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-        maxAge: 24 * 60 * 60 * 1000,
-        secure: process.env.NODE_ENV === 'production'
+app.use(express.json());
+
+// Cookie simple sin express-session
+app.use((req, res, next) => {
+    const cookies = {};
+    if (req.headers.cookie) {
+        req.headers.cookie.split(';').forEach(c => {
+            const [k, v] = c.trim().split('=');
+            cookies[k] = decodeURIComponent(v);
+        });
     }
-}));
+    req.cookies = cookies;
+    next();
+});
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// --- GROQ ---
+async function llamarGroq(prompt) {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${GROQ_API_KEY}`
+        },
+        body: JSON.stringify({
+            model: 'llama-3.3-70b-versatile',
+            messages: [{ role: 'user', content: prompt }],
+            max_tokens: 600
+        })
+    });
+    if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error?.message || 'Error Groq');
+    }
+    const data = await response.json();
+    return data.choices[0].message.content;
+}
+
+function formatearTexto(texto) {
+    if (!texto) return '';
+    return texto
+        .replace(/músculo/gi, 'MÚSCULO')
+        .replace(/musculo/gi, 'MÚSCULO')
+        .replace(/\bpeso\b/gi, 'PESO');
+}
+
+function calcularSalud(peso, estatura) {
+    const imc = (peso / ((estatura / 100) ** 2)).toFixed(1);
+    if (imc < 18.5) return { val: imc, status: 'Bajo PESO', color: '#ffcc00', pct: 25 };
+    if (imc < 25)   return { val: imc, status: 'Saludable',  color: '#00ff88', pct: 50 };
+    if (imc < 30)   return { val: imc, status: 'Sobrepeso',  color: '#ff8800', pct: 75 };
+    return           { val: imc, status: 'Obesidad',   color: '#ff4444', pct: 95 };
+}
 
 const styles = `
     :root { --bg: #0f0f0f; --card: #1a1a1a; --accent: #00d4ff; --sec: #ff8800; --text: #eee; }
@@ -52,25 +96,26 @@ const styles = `
     }
 `;
 
-function formatearTexto(texto) {
-    if (!texto) return '';
-    return texto
-        .replace(/músculo/gi, 'MÚSCULO')
-        .replace(/musculo/gi, 'MÚSCULO')
-        .replace(/\bpeso\b/gi, 'PESO');
+// Helper para cookies seguras en Render (HTTPS)
+const getSecureCookieFlag = () => (process.env.NODE_ENV === 'production' ? 'Secure;' : '');
+
+async function getUsuario(req) {
+    const userId = req.cookies['uid'];
+    const token  = req.cookies['tok'];
+    if (!userId || !token) return null;
+    const { data: user } = await supabase
+        .from('usuarios')
+        .select('*')
+        .eq('id', userId)
+        .eq('session_token', token)
+        .single();
+    return user || null;
 }
 
-function calcularSalud(peso, estatura) {
-    const imc = (peso / ((estatura / 100) ** 2)).toFixed(1);
-    if (imc < 18.5) return { val: imc, status: "Bajo PESO", color: "#ffcc00", pct: 25 };
-    if (imc < 25)   return { val: imc, status: "Saludable", color: "#00ff88", pct: 50 };
-    if (imc < 30)   return { val: imc, status: "Sobrepeso", color: "#ff8800", pct: 75 };
-    return { val: imc, status: "Obesidad", color: "#ff4444", pct: 95 };
-}
+app.get('/', async (req, res) => {
+    const user = await getUsuario(req);
+    if (user) return res.redirect('/dashboard');
 
-// --- RUTA LOGIN ---
-app.get('/', (req, res) => {
-    if (req.session.usuarioId) return res.redirect('/dashboard');
     res.send(`
         <!DOCTYPE html>
         <html lang="es">
@@ -124,10 +169,10 @@ app.get('/', (req, res) => {
     `);
 });
 
-// --- RUTA DASHBOARD ---
 app.get('/dashboard', async (req, res) => {
-    if (!req.session.usuarioId) return res.redirect('/');
-    const { data: user } = await supabase.from('usuarios').select('*').eq('id', req.session.usuarioId).single();
+    const user = await getUsuario(req);
+    if (!user) return res.redirect('/');
+
     const salud = calcularSalud(user.peso, user.estatura);
     const consejoFormateado = formatearTexto(user.consejo_ia || 'Generando plan...');
 
@@ -159,13 +204,11 @@ app.get('/dashboard', async (req, res) => {
                     <h3>PESO registrado</h3>
                     <p>${user.peso} kg</p>
                 </div>
-
                 <div class="stat-card">
                     <div class="icon-meta"></div>
                     <h3>Tu meta</h3>
                     <p style="font-size:1.2rem;">${formatearTexto(user.objetivo)}</p>
                 </div>
-
                 <div class="stat-card">
                     <h3>Tu rango</h3>
                     <span class="rango-txt">Novato</span>
@@ -175,7 +218,6 @@ app.get('/dashboard', async (req, res) => {
                         <span>💎</span>
                     </div>
                 </div>
-
                 <div class="stat-card">
                     <h3>Índice de salud (IMC)</h3>
                     <p style="color:${salud.color}">${salud.val}</p>
@@ -184,7 +226,6 @@ app.get('/dashboard', async (req, res) => {
                         <div class="imc-fill" style="width:${salud.pct}%; background:${salud.color};"></div>
                     </div>
                 </div>
-
                 <div class="stat-card" style="grid-column: span 2;">
                     <h3>Evolución del PESO</h3>
                     <div class="chart-wrapper" style="height:140px;">
@@ -213,14 +254,11 @@ app.get('/dashboard', async (req, res) => {
                     document.getElementById('data-toggle').innerText = isLow ? "Modo: Bajo consumo" : "Modo: Normal";
                     if (!isLow) location.reload();
                 }
-
                 function toggleZoom() {
                     const isZoom = document.body.classList.toggle('zoom-mode');
                     localStorage.setItem('zoomMode', isZoom);
                     document.getElementById('zoom-toggle').innerText = isZoom ? "Zoom: On" : "Zoom: Off";
                 }
-
-                // Restaurar modos guardados
                 if (localStorage.getItem('lowData') === 'true') {
                     document.body.classList.add('low-data');
                     document.getElementById('data-toggle').innerText = "Modo: Bajo consumo";
@@ -229,8 +267,6 @@ app.get('/dashboard', async (req, res) => {
                     document.body.classList.add('zoom-mode');
                     document.getElementById('zoom-toggle').innerText = "Zoom: On";
                 }
-
-                // Grafico de PESO
                 if (!document.body.classList.contains('low-data')) {
                     const ctx = document.getElementById('chart').getContext('2d');
                     new Chart(ctx, {
@@ -245,10 +281,7 @@ app.get('/dashboard', async (req, res) => {
                                 backgroundColor: 'rgba(0,212,255,0.05)'
                             }]
                         },
-                        options: {
-                            maintainAspectRatio: false,
-                            plugins: { legend: { display: false } }
-                        }
+                        options: { maintainAspectRatio: false, plugins: { legend: { display: false } } }
                     });
                 }
             </script>
@@ -257,50 +290,43 @@ app.get('/dashboard', async (req, res) => {
     `);
 });
 
-// --- ACTUALIZAR PESO ---
-app.post('/actualizar-peso', async (req, res) => {
-    if (!req.session.usuarioId) return res.redirect('/');
-    const nuevoPeso = parseFloat(req.body.nuevoPeso);
-    const { data: user } = await supabase.from('usuarios').select('historial_peso').eq('id', req.session.usuarioId).single();
-    const nuevoHistorial = [...user.historial_peso, {
-        fecha: new Date().toLocaleDateString('es-ES'),
-        peso: nuevoPeso
-    }];
-    await supabase.from('usuarios').update({ peso: nuevoPeso, historial_peso: nuevoHistorial }).eq('id', req.session.usuarioId);
-    res.redirect('/dashboard');
-});
-
-// --- LOGIN ---
 app.post('/login', async (req, res) => {
     const { nombre, password } = req.body;
-    const { data: users } = await supabase.from('usuarios').select('*').ilike('nombre', nombre.trim()).limit(1);
+    const { data: users } = await supabase
+        .from('usuarios')
+        .select('*')
+        .ilike('nombre', nombre.trim())
+        .limit(1);
+
     if (users?.[0] && await bcrypt.compare(password, users[0].password)) {
-        req.session.usuarioId = users[0].id;
+        const token = crypto.randomBytes(32).toString('hex');
+        await supabase.from('usuarios').update({ session_token: token }).eq('id', users[0].id);
+        
+        const secureFlag = getSecureCookieFlag();
+        res.setHeader('Set-Cookie', [
+            `uid=${users[0].id}; Path=/; HttpOnly; ${secureFlag} Max-Age=86400; SameSite=Lax`,
+            `tok=${token}; Path=/; HttpOnly; ${secureFlag} Max-Age=86400; SameSite=Lax`
+        ]);
         return res.redirect('/dashboard');
     }
-    res.send(`
-        <!DOCTYPE html>
-        <html lang="es">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Error | EN-FORMA</title>
-            <style>${styles}</style>
-        </head>
-        <body style="display:flex; align-items:center; justify-content:center; min-height:100vh; text-align:center;">
-            <div style="background:var(--card); padding:40px; border-radius:20px; max-width:360px; width:100%;">
-                <p style="color:#ff4444; font-size:1.1rem;">Usuario o contraseña incorrectos.</p>
-                <a href="/" style="color:var(--accent);">Volver al inicio</a>
-            </div>
-        </body>
-        </html>
-    `);
+
+    res.send("Usuario o contraseña incorrectos. <a href='/'>Volver</a>");
 });
 
-// --- REGISTRAR ---
 app.post('/registrar', async (req, res) => {
     const { nombre, edad, peso, estatura, password, objetivo } = req.body;
     const hashed = await bcrypt.hash(password, 10);
+    const token = crypto.randomBytes(32).toString('hex');
+
+    const prompt = `Actua como entrenador personal de EN-FORMA. Crea una rutina corta y motivadora para ${nombre}, de ${edad} anos y ${peso}kg, cuyo objetivo es: ${objetivo}. Se concreto, incluye 3-4 ejercicios con series y repeticiones. Responde en formato HTML usando solo etiquetas p, strong y ul/li. Sin estilos inline.`;
+
+    let consejo_ia = 'Generando plan...';
+    try {
+        consejo_ia = await llamarGroq(prompt);
+    } catch (e) {
+        console.error('Error Groq:', e.message);
+    }
+
     const { data } = await supabase.from('usuarios').insert([{
         nombre: nombre.trim(),
         edad: parseInt(edad),
@@ -308,17 +334,37 @@ app.post('/registrar', async (req, res) => {
         estatura: parseInt(estatura),
         password: hashed,
         objetivo,
-        consejo_ia: "Generando plan...",
+        consejo_ia,
+        session_token: token,
         historial_peso: [{ fecha: new Date().toLocaleDateString('es-ES'), peso: parseFloat(peso) }]
     }]).select();
-    req.session.usuarioId = data[0].id;
+
+    const secureFlag = getSecureCookieFlag();
+    res.setHeader('Set-Cookie', [
+        `uid=${data[0].id}; Path=/; HttpOnly; ${secureFlag} Max-Age=86400; SameSite=Lax`,
+        `tok=${token}; Path=/; HttpOnly; ${secureFlag} Max-Age=86400; SameSite=Lax`
+    ]);
     res.redirect('/dashboard');
 });
 
-// --- LOGOUT ---
+app.post('/actualizar-peso', async (req, res) => {
+    const user = await getUsuario(req);
+    if (!user) return res.redirect('/');
+    const nuevoPeso = parseFloat(req.body.nuevoPeso);
+    const nuevoHistorial = [...user.historial_peso, {
+        fecha: new Date().toLocaleDateString('es-ES'),
+        peso: nuevoPeso
+    }];
+    await supabase.from('usuarios').update({ peso: nuevoPeso, historial_peso: nuevoHistorial }).eq('id', user.id);
+    res.redirect('/dashboard');
+});
+
 app.post('/logout', (req, res) => {
-    req.session.destroy();
+    res.setHeader('Set-Cookie', [
+        'uid=; Path=/; Max-Age=0',
+        'tok=; Path=/; Max-Age=0'
+    ]);
     res.redirect('/');
 });
 
-app.listen(PORT, () => console.log("Servidor EN-FORMA activo en puerto " + PORT));
+app.listen(PORT, () => console.log('Servidor EN-FORMA activo en puerto ' + PORT));
