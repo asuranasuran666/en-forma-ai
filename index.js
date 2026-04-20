@@ -66,6 +66,32 @@ const styles = `
     .navbar { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; background: var(--card); border-bottom: 1px solid #333; position: sticky; top: 0; z-index: 100; }
 // --- FUNCIÓN DE IA (GROQ) ---
 async function llamarGroq(prompt) {
+    try { // <--- ESTO ES LO QUE TE FALTA ABRIR
+        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${process.env.GROQ_API_KEY}`
+            },
+            body: JSON.stringify({
+                model: 'llama-3.3-70b-versatile',
+                messages: [{ role: 'user', content: prompt }],
+                max_tokens: 1000
+            })
+        }); // <--- AQUÍ SE CIERRA EL FETCH
+
+        const data = await response.json();
+
+        if (data && data.choices && data.choices[0] && data.choices[0].message) {
+            return data.choices[0].message.content;
+        } else {
+            console.error("Error en la respuesta de Groq:", data);
+            return "Lo siento, hubo un problema con la IA.";
+        }
+    } catch (error) { // <--- AHORA ESTE CATCH SÍ TIENE SENTIDO
+        console.error("Error de conexión:", error);
+        return "Error de conexión con el servidor de inteligencia artificial";
+    }
     const response = await fetch('https://api.groq.com/openai/v1/chat/comple>
         method: 'POST',
         headers: {
