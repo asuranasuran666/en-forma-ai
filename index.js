@@ -5,7 +5,7 @@ const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 const app = express();
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
@@ -64,7 +64,34 @@ const styles = `
     body.zoom-mode { font-size: 1.25rem; }
     .app-container { padding: 20px; max-width: 1200px; margin: 0 auto; }
     .navbar { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; background: var(--card); border-bottom: 1px solid #333; position: sticky; top: 0; z-index: 100; }
-    .menu-btn { font-size: 1.8rem; cursor: pointer; color: var(--accent); background: none; border: none; }
+// --- FUNCIÓN DE IA (GROQ) ---
+async function llamarGroq(prompt) {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/comple>
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${GROQ_API_KEY}`
+        },
+        body: JSON.stringify({
+            model: 'llama-3.3-70b-versatile',
+            messages: [{ role: 'user', content: prompt }],
+            max_tokens: 1000
+        })
+    });
+    const data = await response.json();
+
+        // Verificamos que la respuesta tenga datos antes de intentar leerlos
+        if (data && data.choices && data.choices[0] && data.choices[0].messa>
+            return data.choices[0].message.content;
+        } else {
+            console.error("Error en la respuesta de Groq:", data);
+            return "Lo siento, hubo un problema con la IA. Por favor, intent>
+        }
+    } catch (error) {
+        console.error("Error de conexión:", error);
+        return "Error de conexión con el servidor de inteligencia artificial>
+    }
+}    .menu-btn { font-size: 1.8rem; cursor: pointer; color: var(--accent); background: none; border: none; }
     .sidebar { position: fixed; top: 0; left: -300px; width: 280px; height: 100%; background: var(--card); z-index: 200; padding: 20px; transition: 0.3s; overflow-y: auto; box-shadow: 5px 0 15px rgba(0,0,0,0.5); }
     .sidebar.active { left: 0; }
     .card { background: var(--card); padding: 25px; border-radius: 20px; margin-bottom: 20px; }
@@ -204,4 +231,4 @@ app.post('/logout', (req, res) => {
     res.redirect('/');
 });
 
-app.listen(PORT, () => console.log('Servidor en puerto ' + PORT));
+app.listen(PORT,'0.0.0.0', app.listen(PORT,'0.0.0.0', () => console.log('Servidor en puerto ' + PORT));() => console.log('Servidor en puerto ' + PORT));
