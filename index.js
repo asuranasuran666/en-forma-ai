@@ -43,7 +43,18 @@ async function llamarGroq(prompt) {
         })
     });
     const data = await response.json();
-    return data.choices[0].message.content;
+
+        // Verificamos que la respuesta tenga datos antes de intentar leerlos
+        if (data && data.choices && data.choices[0] && data.choices[0].message) {
+            return data.choices[0].message.content;
+        } else {
+            console.error("Error en la respuesta de Groq:", data);
+            return "Lo siento, hubo un problema con la IA. Por favor, intenta de nuevo.";
+        }
+    } catch (error) {
+        console.error("Error de conexión:", error);
+        return "Error de conexión con el servidor de inteligencia artificial.";
+    }
 }
 
 // --- ESTILOS DE LA APP ---
@@ -74,7 +85,7 @@ async function getUsuario(req) {
 app.get('/', async (req, res) => {
     const user = await getUsuario(req);
     if (user) return res.redirect('/dashboard');
-    res.send(\`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><style>\${styles}</style></head>
+    res.send(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><style>\${styles}</style></head>
     <body style="display:flex; align-items:center; justify-content:center; min-height:100vh;">
         <div class="card" style="width:350px;">
             <h1 style="color:var(--accent); text-align:center;">EN-FORMA AI</h1>
@@ -107,7 +118,7 @@ app.get('/dashboard', async (req, res) => {
     if (!user) return res.redirect('/');
     const { data: notas } = await supabase.from('notas').select('*').eq('usuario_id', user.id).order('fecha', { ascending: false });
 
-    res.send(\`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><style>\${styles}</style></head>
+    res.send(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><style>\${styles}</style></head>
     <body>
         <div class="sidebar" id="sidebar">
             <h2 style="color:var(--accent);">Menú</h2>
