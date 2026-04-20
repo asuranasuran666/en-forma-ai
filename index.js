@@ -56,22 +56,33 @@ async function llamarGroq(prompt) {
 // --- ESTILOS ---
 const styles = `
     :root { --bg: #0f0f0f; --card: #1a1a1a; --accent: #ff6600; --text: #eee; --danger: #cc3333; }
-    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; margin: 0; }
-    .app-container { padding: 20px; max-width: 1200px; margin: 0 auto; }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; margin: 0; transition: font-size 0.2s; }
+    body.zoom-mode { font-size: 1.4rem; }
+    .app-container { padding: 20px; max-width: 800px; margin: 0 auto; }
     .navbar { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; background: var(--card); border-bottom: 2px solid var(--accent); position: sticky; top: 0; z-index: 100; }
+    .sidebar { position: fixed; top: 0; left: -300px; width: 280px; height: 100%; background: var(--card); z-index: 200; padding: 20px; transition: 0.3s; border-right: 1px solid var(--accent); overflow-y: auto; }
+    .sidebar.active { left: 0; }
     .card { background: var(--card); padding: 25px; border-radius: 20px; margin-bottom: 20px; border: 1px solid #333; }
-    input, select, textarea { background: #222; border: 1px solid #444; color: #fff; padding: 12px; border-radius: 10px; width: 100%; margin-bottom: 15px; }
-    button { padding: 14px; background: var(--accent); border: none; color: #fff; font-weight: bold; cursor: pointer; border-radius: 10px; width: 100%; }
+    input, select, textarea { background: #222; border: 1px solid #444; color: #fff; padding: 12px; border-radius: 10px; width: 100%; margin-bottom: 15px; font-family: inherit; }
+    button { padding: 14px; background: var(--accent); border: none; color: #fff; font-weight: bold; cursor: pointer; border-radius: 10px; width: 100%; transition: 0.2s; }
+    button:hover { opacity: 0.8; }
+    .menu-btn { background: none; color: var(--accent); font-size: 2rem; width: auto; padding: 0; cursor: pointer; border: none; }
+    .audio-panel { background: #222; padding: 15px; border-radius: 15px; margin-top: 15px; border: 1px solid var(--accent); }
+    .note-item { border-bottom: 1px solid #333; padding: 10px 0; }
 `;
 
 async function getUsuario(req) {
-    const userId = req.cookies['uid'];
-    if (!userId) return null;
-    const { data: user } = await supabase.from('usuarios').select('*').eq('id', userId).single();
-    return user || null;
+    try {
+        const userId = req.cookies['uid'];
+        if (!userId) return null;
+        const { data: user, error } = await supabase.from('usuarios').select('*').eq('id', userId).single();
+        if (error) return null;
+        return user;
+    } catch (e) {
+        return null;
+    }
 }
 
-// --- RUTAS ---
 app.get('/', async (req, res) => {
     const user = await getUsuario(req);
     if (user) return res.redirect('/dashboard');
@@ -87,33 +98,63 @@ app.get('/', async (req, res) => {
                 <button onclick="document.getElementById('reg').style.display='block'" style="background:none; color:var(--accent); margin-top:10px;">Crear cuenta</button>
             </div>
         </div>
-        <div id="reg" class="card" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); width:400px; z-index:1000; background:#1a1a1a;">
+        <div id="reg" class="card" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); width:400px; z-index:1000; background:#1a1a1a; box-shadow: 0 0 20px rgba(0,0,0,0.5);">
             <h2>Registro EN-FORMA</h2>
             <form action="/registrar" method="POST">
                 <input name="nombre" placeholder="Nombre" required>
                 <input name="edad" type="number" placeholder="Edad" required>
                 <input name="estatura" type="number" placeholder="Estatura (cm)" required>
                 <input name="peso" type="number" step="0.1" placeholder="Peso (kg)" required>
-                <select name="objetivo"><option value="Perder PESO">Perder PESO</option><option value="Ganar MÚSCULO">Ganar MÚSCULO</option></select>
+                
+                <select name="sexo">
+                    <option value="Masculino">Hombre</option>
+                    <option value="Femenino">Mujer</option>
+                </select>
+
+                <select name="objetivo">
+                    <option value="Perder PESO">Perder PESO</option>
+                    <option value="Ganar MÚSCULO">Ganar MÚSCULO</option>
+                </select>
+
+                <textarea name="padecimientos" placeholder="Lesiones o padecimientos (opcional)"></textarea>
+
                 <input name="password" type="password" placeholder="Contraseña" required>
                 <button>COMENZAR</button>
             </form>
+            <button onclick="document.getElementById('reg').style.display='none'" style="background:none; color:#777; font-size:0.8rem;">Cerrar</button>
         </div>
     </body></html>`);
 });
-
 app.get('/dashboard', async (req, res) => {
     const user = await getUsuario(req);
     if (!user) return res.redirect('/');
     const { data: notas } = await supabase.from('notas').select('*').eq('usuario_id', user.id).order('fecha', { ascending: false });
 
     res.send(`<html><head><style>${styles}</style></head><body>
-        <div class="navbar"><h3>EN-FORMA AI</h3><form action="/logout" method="POST"><button style="width:auto; padding:5px 15px; background:var(--danger);">Salir</button></form></div>
+        <div class="sidebar" id="sidebar">
+            <h2 style="color:var(--accent);">Ajustes</h2>
+            <button onclick="document.body.classList.toggle('zoom-mode')">🔍 Zoom +/-</button>
+            <div class="audio-panel">
+                <p style="color:var(--accent); font-size:0.8rem; margin-bottom:10px;">🎧 NARRACIÓN</p>
+                <button onclick="leer()" style="padding:8px; font-size:0.8rem;">🔊 Escuchar Plan</button>
+            </div>
+            <form action="/logout" method="POST" style="margin-top:20px;">
+                <button style="background:var(--danger); color:white;">Cerrar Sesión</button>
+            </form>
+        </div>
+
+        <div class="navbar">
+            <button class="menu-btn" onclick="document.getElementById('sidebar').classList.toggle('active')">☰</button>
+            <h3>EN-FORMA AI</h3>
+            <div style="width:40px;"></div>
+        </div>
+        
         <div class="app-container">
             <div class="card" style="border-left:5px solid var(--accent);">
                 <h2>Plan Personalizado: ${user.nombre}</h2>
                 <div id="rutina">${user.consejo_ia}</div>
             </div>
+
             <div class="card">
                 <h3>Diario de Entrenamiento</h3>
                 <form action="/guardar-nota" method="POST">
@@ -125,22 +166,47 @@ app.get('/dashboard', async (req, res) => {
                 </div>
             </div>
         </div>
+
+        <script>
+            function leer() {
+                const s = window.speechSynthesis;
+                const u = new SpeechSynthesisUtterance(document.getElementById('rutina').innerText);
+                u.lang = 'es-ES';
+                u.rate = 0.9;
+                s.speak(u);
+            }
+        </script>
     </body></html>`);
 });
 
 app.post('/registrar', async (req, res) => {
     try {
-        const { nombre, edad, peso, estatura, password, objetivo } = req.body;
+        // 1. Recogemos todos los campos nuevos
+        const { nombre, edad, peso, estatura, password, objetivo, sexo, padecimientos } = req.body;
         const hashed = await bcrypt.hash(password, 10);
-        const p = `Crea una rutina de gimnasio para ${nombre}, de ${edad} años y ${peso}kg, con el objetivo de ${objetivo}. Responde en HTML simple.`;
+
+        // 2. Prompt mejorado para la IA (incluye sexo y lesiones)
+        const p = `Eres un entrenador experto. Crea una rutina fitness en HTML (usa <b>, <br>, <ul>, <li>) para ${nombre}. 
+        Perfil: ${sexo}, ${edad} años, ${peso}kg, ${estatura}cm. 
+        Objetivo: ${objetivo}. 
+        Restricciones médicas: ${padecimientos || 'Ninguna'}. 
+        Sé motivador y directo.`;
+
         const consejo = await llamarGroq(p);
+
+        // 3. Guardamos TODO en la base de datos
         const { data, error } = await supabase.from('usuarios').insert([{
-            nombre, edad, peso, estatura, password: hashed, objetivo, consejo_ia: consejo
+            nombre, edad, peso, estatura, sexo, padecimientos, password: hashed, objetivo, consejo_ia: consejo
         }]).select();
+
         if (error) throw error;
+
         res.setHeader('Set-Cookie', `uid=${data[0].id}; Path=/; HttpOnly; Max-Age=86400`);
         res.redirect('/dashboard');
-    } catch (e) { res.send("Error: " + e.message); }
+    } catch (e) { 
+        console.error(e);
+        res.send("Error en el registro: " + e.message); 
+    }
 });
 
 app.post('/login', async (req, res) => {
@@ -155,7 +221,9 @@ app.post('/login', async (req, res) => {
 
 app.post('/guardar-nota', async (req, res) => {
     const user = await getUsuario(req);
-    if (user) await supabase.from('notas').insert([{ usuario_id: user.id, contenido: req.body.contenido }]);
+    if (user) {
+        await supabase.from('notas').insert([{ usuario_id: user.id, contenido: req.body.contenido }]);
+    }
     res.redirect('/dashboard');
 });
 
@@ -164,4 +232,5 @@ app.post('/logout', (req, res) => {
     res.redirect('/');
 });
 
-app.listen(PORT, '0.0.0.0', () => console.log('Servidor en puerto ' + PORT));
+app.listen(PORT, '0.0.0.0', () => console.log('Servidor activo en puerto ' + PORT));
+
