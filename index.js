@@ -1,236 +1,1124 @@
+
+Copiar
+
 require('dotenv').config();
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const bcrypt = require('bcrypt');
+ 
 const app = express();
-
 const PORT = process.env.PORT || 10000;
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_KEY;
-const GROQ_API_KEY = process.env.GROQ_API_KEY;
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+ 
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
-
-// --- GESTIÓN DE SESIONES (COOKIES) ---
+ 
+// ─── COOKIE PARSER ───────────────────────────────────────────
 app.use((req, res, next) => {
     const cookies = {};
     if (req.headers.cookie) {
         req.headers.cookie.split(';').forEach(c => {
-            const [k, v] = c.trim().split('=');
-            cookies[k] = decodeURIComponent(v);
+            const parts = c.trim().split('=');
+            const key = parts.shift().trim();
+            cookies[key] = decodeURIComponent(parts.join('='));
         });
     }
     req.cookies = cookies;
     next();
 });
-
-// --- FUNCIÓN DE IA (GROQ) ---
+ 
+// ─── GROQ IA ─────────────────────────────────────────────────
 async function llamarGroq(prompt) {
     try {
-        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${GROQ_API_KEY}`
+                'Authorization': `Bearer ${process.env.GROQ_API_KEY}`
             },
             body: JSON.stringify({
                 model: 'llama-3.3-70b-versatile',
                 messages: [{ role: 'user', content: prompt }],
-                max_tokens: 1000
+                max_tokens: 1500
             })
         });
-        const data = await response.json();
-        if (data && data.choices && data.choices[0]) {
-            return data.choices[0].message.content;
-        }
-        return "Lo siento, hubo un problema con la IA.";
-    } catch (error) {
-        console.error("Error Groq:", error);
-        return "Error de conexión con la IA.";
-    }
-}
-
-// --- ESTILOS ---
-const styles = `
-    :root { --bg: #0f0f0f; --card: #1a1a1a; --accent: #ff6600; --text: #eee; --danger: #cc3333; }
-    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; margin: 0; transition: font-size 0.2s; }
-    body.zoom-mode { font-size: 1.4rem; }
-    .app-container { padding: 20px; max-width: 800px; margin: 0 auto; }
-    .navbar { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; background: var(--card); border-bottom: 2px solid var(--accent); position: sticky; top: 0; z-index: 100; }
-    .sidebar { position: fixed; top: 0; left: -300px; width: 280px; height: 100%; background: var(--card); z-index: 200; padding: 20px; transition: 0.3s; border-right: 1px solid var(--accent); overflow-y: auto; }
-    .sidebar.active { left: 0; }
-    .card { background: var(--card); padding: 25px; border-radius: 20px; margin-bottom: 20px; border: 1px solid #333; }
-    input, select, textarea { background: #222; border: 1px solid #444; color: #fff; padding: 12px; border-radius: 10px; width: 100%; margin-bottom: 15px; font-family: inherit; }
-    button { padding: 14px; background: var(--accent); border: none; color: #fff; font-weight: bold; cursor: pointer; border-radius: 10px; width: 100%; transition: 0.2s; }
-    button:hover { opacity: 0.8; }
-    .menu-btn { background: none; color: var(--accent); font-size: 2rem; width: auto; padding: 0; cursor: pointer; border: none; }
-    .audio-panel { background: #222; padding: 15px; border-radius: 15px; margin-top: 15px; border: 1px solid var(--accent); }
-    .note-item { border-bottom: 1px solid #333; padding: 10px 0; }
-`;
-
-async function getUsuario(req) {
-    try {
-        const userId = req.cookies['uid'];
-        if (!userId) return null;
-        const { data: user, error } = await supabase.from('usuarios').select('*').eq('id', userId).single();
-        if (error) return null;
-        return user;
+        const data = await res.json();
+        return data?.choices?.[0]?.message?.content || null;
     } catch (e) {
+        console.error('Error Groq:', e);
         return null;
     }
 }
-
+ 
+// ─── HELPERS ─────────────────────────────────────────────────
+function calcIMC(peso, estatura) {
+    return Math.round((peso / Math.pow(estatura / 100, 2)) * 10) / 10;
+}
+ 
+function infoIMC(imc) {
+    if (imc < 18.5) return { label: 'Bajo peso',  color: '#ffaa00', pct: 15 };
+    if (imc < 25)   return { label: 'Saludable',  color: '#00ff88', pct: 50 };
+    if (imc < 30)   return { label: 'Sobrepeso',  color: '#ffaa00', pct: 72 };
+    return              { label: 'Obesidad',   color: '#ff4444', pct: 90 };
+}
+ 
+function infoRango(n) {
+    if (n < 5)  return { label: 'Novato',     color: '#ffcc00', icons: '🔥💧💎' };
+    if (n < 15) return { label: 'Intermedio', color: '#00d4ff', icons: '⚡💪🎯' };
+    if (n < 30) return { label: 'Avanzado',   color: '#ff6600', icons: '🏋️🔥⚡' };
+    return          { label: 'Élite',      color: '#ff44ff', icons: '🏆👑💎' };
+}
+ 
+function buildPrompt(u) {
+    const imc = calcIMC(u.peso, u.estatura);
+    const { label: imcLabel } = infoIMC(imc);
+    return `Eres un médico deportivo y entrenador personal certificado. Tu misión es crear una rutina FITNESS completamente PERSONALIZADA y SEGURA.
+ 
+PERFIL DEL PACIENTE:
+- Nombre: ${u.nombre} | Sexo: ${u.sexo} | Edad: ${u.edad} años
+- Peso actual: ${u.peso}kg | Estatura: ${u.estatura}cm | IMC: ${imc} (${imcLabel})
+- Objetivo principal: ${u.objetivo}
+- Condiciones médicas / lesiones: ${u.padecimientos || 'Sin restricciones conocidas'}
+ 
+INSTRUCCIONES OBLIGATORIAS:
+1. Si hay padecimientos o lesiones, analízalos con criterio médico y EXCLUYE todos los ejercicios que puedan causarles daño. Explica en 1-2 líneas por qué se evitan.
+2. Crea un plan semanal de 5 días (Lun-Vie) con descanso Sáb-Dom.
+3. Cada día debe incluir: calentamiento (5 min), ejercicios principales con series/reps, y enfriamiento (5 min).
+4. Adapta la intensidad al IMC y objetivo del paciente.
+5. Sé motivador, directo y profesional. Tutéa al paciente.
+6. Responde ÚNICAMENTE en HTML limpio. Usa SOLO estas etiquetas: <b>, <br>, <ul>, <li>, <h3>, <p>. Sin <html>, sin <head>, sin <body>, sin estilos inline.`;
+}
+ 
+async function getUser(req) {
+    try {
+        const uid = req.cookies['uid'];
+        if (!uid) return null;
+        const { data } = await supabase.from('usuarios').select('*').eq('id', uid).single();
+        return data || null;
+    } catch { return null; }
+}
+ 
+// ─── CSS ─────────────────────────────────────────────────────
+const CSS = `
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Exo+2:wght@300;400;600;700&display=swap');
+ 
+:root {
+    --bg: #090910;
+    --card: #111118;
+    --card2: #18182a;
+    --accent: #00d4ff;
+    --accent2: #ff6600;
+    --text: #dde0ee;
+    --muted: #5a5a7a;
+    --danger: #cc2222;
+    --green: #00ff88;
+    --yellow: #ffcc00;
+    --border: rgba(0, 212, 255, 0.1);
+    --border2: rgba(255, 255, 255, 0.05);
+}
+ 
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+ 
+body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Exo 2', sans-serif;
+    font-size: 16px;
+    transition: font-size .25s;
+    min-height: 100vh;
+    background-image: radial-gradient(ellipse at 80% 0%, rgba(0,212,255,0.04) 0%, transparent 60%);
+}
+ 
+body.zoom-mode { font-size: 20px; }
+ 
+/* ── TOPBAR ── */
+.topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 11px 20px;
+    background: rgba(17,17,24,0.95);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(10px);
+    flex-wrap: wrap;
+    gap: 8px;
+}
+ 
+.topbar-brand {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 1.35em;
+    color: var(--accent);
+    letter-spacing: 4px;
+    font-weight: 700;
+    text-shadow: 0 0 20px rgba(0,212,255,0.4);
+}
+ 
+.topbar-actions { display: flex; gap: 7px; flex-wrap: wrap; align-items: center; }
+ 
+.tbtn {
+    padding: 7px 14px;
+    border-radius: 20px;
+    font-family: 'Exo 2', sans-serif;
+    font-size: .75em;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: .5px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.04);
+    color: var(--muted);
+    transition: .2s;
+    width: auto;
+}
+ 
+.tbtn:hover { border-color: var(--accent); color: var(--accent); background: rgba(0,212,255,0.06); }
+.tbtn.on { background: var(--accent); color: #000; border-color: var(--accent); }
+.tbtn.red { background: var(--danger); color: #fff; border-color: var(--danger); opacity: .9; }
+.tbtn.red:hover { opacity: 1; }
+ 
+/* ── WRAPPER ── */
+.wrap { max-width: 840px; margin: 0 auto; padding: 20px 14px 40px; }
+ 
+.greeting {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 2em;
+    font-weight: 700;
+    margin-bottom: 20px;
+    letter-spacing: 1px;
+}
+.greeting span { color: var(--accent); }
+ 
+/* ── STATS GRID ── */
+.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+ 
+.sc {
+    background: var(--card);
+    border: 1px solid var(--border2);
+    border-top: 2px solid var(--accent);
+    border-radius: 14px;
+    padding: 16px 12px;
+    text-align: center;
+    transition: border-color .2s;
+}
+ 
+.sc:hover { border-top-color: var(--accent); border-color: var(--border); }
+.sc .si { font-size: 1.9em; margin-bottom: 5px; }
+.sc .sl { font-size: .7em; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+.sc .sv { font-family: 'Rajdhani', sans-serif; font-size: 1.8em; font-weight: 700; line-height: 1; }
+.sc .ss { font-size: .72em; color: var(--muted); margin-top: 4px; }
+.sc .ricons { font-size: 1em; letter-spacing: 3px; margin-top: 5px; }
+ 
+.imc-bar { background: #222; border-radius: 6px; height: 6px; margin-top: 8px; overflow: hidden; }
+.imc-fill { height: 100%; border-radius: 6px; transition: width .8s ease; }
+ 
+/* ── CARD BASE ── */
+.card {
+    background: var(--card);
+    border: 1px solid var(--border2);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 14px;
+}
+ 
+.card.hl { border-left: 3px solid var(--accent); }
+.card.hl2 { border-left: 3px solid var(--accent2); }
+ 
+.card-t {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 1.05em;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border2);
+    padding-bottom: 10px;
+    margin-bottom: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+ 
+/* ── RUTINA ── */
+#rutina { line-height: 1.75; }
+#rutina b { color: var(--accent); }
+#rutina h3 { color: var(--accent2); margin: 14px 0 6px; font-family: 'Rajdhani', sans-serif; font-size: 1.05em; letter-spacing: 1px; text-transform: uppercase; }
+#rutina ul { padding-left: 18px; margin: 8px 0; }
+#rutina li { margin-bottom: 6px; }
+#rutina p { margin-bottom: 8px; }
+ 
+/* ── INPUTS ── */
+input, select, textarea {
+    background: #0e0e18;
+    border: 1px solid rgba(255,255,255,0.08);
+    color: var(--text);
+    padding: 11px 14px;
+    border-radius: 10px;
+    width: 100%;
+    margin-bottom: 12px;
+    font-family: 'Exo 2', sans-serif;
+    font-size: 1em;
+    transition: border .2s, box-shadow .2s;
+}
+ 
+input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(0,212,255,0.08);
+}
+ 
+textarea { min-height: 76px; resize: vertical; }
+select option { background: #111118; }
+label { display: block; font-size: .78em; color: var(--muted); margin-bottom: 5px; letter-spacing: .5px; text-transform: uppercase; }
+ 
+/* ── BUTTONS ── */
+button {
+    padding: 12px;
+    background: var(--accent);
+    border: none;
+    color: #000;
+    font-family: 'Exo 2', sans-serif;
+    font-weight: 700;
+    font-size: 1em;
+    cursor: pointer;
+    border-radius: 10px;
+    width: 100%;
+    letter-spacing: .5px;
+    transition: .2s;
+}
+ 
+button:hover { opacity: .85; transform: translateY(-1px); box-shadow: 0 4px 15px rgba(0,212,255,0.2); }
+button:active { transform: translateY(0); }
+button.sec { background: rgba(255,255,255,0.05); color: var(--text); border: 1px solid rgba(255,255,255,0.1); }
+button.sec:hover { box-shadow: none; background: rgba(255,255,255,0.08); }
+button.red { background: var(--danger); color: #fff; }
+button.red:hover { box-shadow: 0 4px 15px rgba(204,34,34,0.3); }
+button.orange { background: var(--accent2); color: #fff; }
+button.orange:hover { box-shadow: 0 4px 15px rgba(255,102,0,0.3); }
+ 
+.brow { display: flex; gap: 10px; }
+.brow button { flex: 1; }
+ 
+/* ── PESO UPDATE ── */
+.prow { display: flex; gap: 8px; margin-bottom: 10px; align-items: flex-end; }
+.prow input { flex: 1; margin-bottom: 0; }
+.prow button { width: auto; padding: 11px 18px; white-space: nowrap; flex-shrink: 0; }
+ 
+/* ── HISTORIAL ── */
+.hist { max-height: 170px; overflow-y: auto; margin-top: 8px; }
+.hi { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--border2); font-size: .88em; }
+.hi-f { color: var(--muted); }
+.hi-v { color: var(--accent); font-weight: 700; font-family: 'Rajdhani', sans-serif; font-size: 1.1em; }
+ 
+/* ── NOTAS ── */
+.ni { padding: 10px 0; border-bottom: 1px solid var(--border2); }
+.ni-f { font-size: .72em; color: var(--muted); margin-bottom: 3px; letter-spacing: .5px; }
+.notas-list { max-height: 260px; overflow-y: auto; margin-top: 8px; }
+ 
+/* ── ACCORDION ── */
+.acc {
+    background: var(--card2);
+    border: 1px solid var(--border2);
+    border-radius: 14px;
+    margin-bottom: 14px;
+    overflow: hidden;
+}
+ 
+.acc-h {
+    padding: 14px 18px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 1em;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--accent);
+    user-select: none;
+    transition: background .2s;
+}
+ 
+.acc-h:hover { background: rgba(0,212,255,0.04); }
+.acc-b { padding: 0 18px; max-height: 0; overflow: hidden; transition: max-height .35s ease, padding .35s; }
+.acc-b.open { max-height: 600px; padding: 6px 18px 18px; }
+ 
+.setting-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; gap: 10px; }
+.setting-label { font-size: .82em; color: var(--muted); letter-spacing: .5px; }
+ 
+/* ── MÚSICA ── */
+.mbgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 8px; }
+.mb {
+    padding: 10px 8px;
+    font-size: .78em;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.03);
+    color: var(--muted);
+    border: 1px solid rgba(255,255,255,0.07);
+    cursor: pointer;
+    letter-spacing: .5px;
+    transition: .2s;
+}
+.mb:hover { border-color: var(--accent); color: var(--text); }
+.mb.on { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 700; }
+ 
+/* ── VOZ ── */
+.voice-row { display: flex; gap: 8px; margin-top: 8px; }
+.vb {
+    flex: 1;
+    padding: 10px;
+    font-size: .78em;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.03);
+    color: var(--muted);
+    border: 1px solid rgba(255,255,255,0.07);
+    cursor: pointer;
+    transition: .2s;
+    text-align: center;
+}
+.vb:hover { border-color: var(--accent2); color: var(--text); }
+.vb.on { background: var(--accent2); color: #fff; border-color: var(--accent2); font-weight: 700; }
+ 
+#voiceSelect { margin-bottom: 0; margin-top: 8px; font-size: .88em; }
+ 
+/* ── LOGIN PAGE ── */
+.lp {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background:
+        radial-gradient(ellipse 80% 60% at 50% -10%, rgba(0,212,255,0.1) 0%, transparent 60%),
+        var(--bg);
+}
+ 
+.lc {
+    background: var(--card);
+    border: 1px solid rgba(0,212,255,0.2);
+    border-radius: 20px;
+    padding: 38px 28px;
+    width: 100%;
+    max-width: 380px;
+    box-shadow: 0 0 80px rgba(0,212,255,0.06), 0 0 0 1px rgba(0,212,255,0.05);
+}
+ 
+.logo { text-align: center; margin-bottom: 28px; }
+.logo h1 {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 2.6em;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 6px;
+    text-shadow: 0 0 30px rgba(0,212,255,0.5);
+}
+.logo p { color: var(--muted); font-size: .8em; margin-top: 6px; letter-spacing: 2px; }
+ 
+.lnk {
+    background: none;
+    color: var(--accent);
+    border: none;
+    font-size: .88em;
+    cursor: pointer;
+    width: auto;
+    padding: 8px;
+    text-decoration: underline;
+    display: block;
+    margin: 6px auto 0;
+    transform: none;
+    box-shadow: none;
+    letter-spacing: 0;
+}
+.lnk:hover { opacity: .8; transform: none; box-shadow: none; }
+ 
+.err {
+    background: rgba(204,34,34,0.12);
+    border: 1px solid rgba(204,34,34,0.3);
+    color: #ff6666;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: .85em;
+    margin-bottom: 14px;
+    text-align: center;
+}
+ 
+/* ── MODAL ── */
+.mo {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.88);
+    z-index: 500;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    backdrop-filter: blur(4px);
+}
+.mo.open { display: flex; }
+ 
+.mb2 {
+    background: var(--card);
+    border: 1px solid rgba(0,212,255,0.2);
+    border-radius: 20px;
+    padding: 28px;
+    width: 100%;
+    max-width: 440px;
+    max-height: 94vh;
+    overflow-y: auto;
+}
+ 
+.mo-t {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 1.5em;
+    color: var(--accent);
+    margin-bottom: 20px;
+    letter-spacing: 3px;
+}
+ 
+/* ── SPINNER ── */
+.spin-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.92);
+    z-index: 999;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    backdrop-filter: blur(6px);
+}
+.spin-overlay.show { display: flex; }
+.spin {
+    width: 52px; height: 52px;
+    border: 3px solid rgba(0,212,255,0.15);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: sp .75s linear infinite;
+    box-shadow: 0 0 20px rgba(0,212,255,0.2);
+}
+@keyframes sp { to { transform: rotate(360deg); } }
+.spin-t {
+    color: var(--accent);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 1.2em;
+    letter-spacing: 4px;
+    text-shadow: 0 0 20px rgba(0,212,255,0.5);
+}
+.spin-sub { color: var(--muted); font-size: .8em; letter-spacing: 1px; }
+ 
+/* ── DIVIDER ── */
+.div { height: 1px; background: var(--border2); margin: 14px 0; }
+ 
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0,212,255,0.3); border-radius: 2px; }
+ 
+/* ── RESPONSIVE ── */
+@media (max-width: 480px) {
+    .stats { gap: 8px; }
+    .sc { padding: 12px 8px; }
+    .sc .sv { font-size: 1.5em; }
+    .sc .si { font-size: 1.6em; }
+    .greeting { font-size: 1.7em; }
+    .topbar-brand { font-size: 1.1em; letter-spacing: 3px; }
+}
+`;
+ 
+// ─── HTML BASE ────────────────────────────────────────────────
+const page = (content, title = 'EN-FORMA AI') =>
+    `<!DOCTYPE html><html lang="es"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${title}</title>
+    <style>${CSS}</style>
+    </head><body>${content}</body></html>`;
+ 
+// ─── GET / ─────────────────────────────────────────────────────
 app.get('/', async (req, res) => {
-    const user = await getUsuario(req);
+    const user = await getUser(req);
     if (user) return res.redirect('/dashboard');
-    res.send(`<html><head><style>${styles}</style></head><body>
-        <div class="app-container" style="display:flex; justify-content:center; align-items:center; min-height:80vh;">
-            <div class="card" style="width:350px;">
-                <h1 style="color:var(--accent); text-align:center;">EN-FORMA AI</h1>
-                <form action="/login" method="POST">
-                    <input name="nombre" placeholder="Usuario" required>
-                    <input name="password" type="password" placeholder="Contraseña" required>
-                    <button>ENTRAR</button>
-                </form>
-                <button onclick="document.getElementById('reg').style.display='block'" style="background:none; color:var(--accent); margin-top:10px;">Crear cuenta</button>
+ 
+    const err = req.query.err === '1' ? `<div class="err">Usuario o contraseña incorrectos.</div>` : '';
+    const regErr = req.query.regerr ? `<div class="err">${decodeURIComponent(req.query.regerr)}</div>` : '';
+ 
+    res.send(page(`
+    <div class="lp">
+        <div class="lc">
+            <div class="logo">
+                <h1>EN-FORMA</h1>
+                <p>ENTRENADOR PERSONAL CON IA</p>
             </div>
-        </div>
-        <div id="reg" class="card" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); width:400px; z-index:1000; background:#1a1a1a; box-shadow: 0 0 20px rgba(0,0,0,0.5);">
-            <h2>Registro EN-FORMA</h2>
-            <form action="/registrar" method="POST">
-                <input name="nombre" placeholder="Nombre" required>
-                <input name="edad" type="number" placeholder="Edad" required>
-                <input name="estatura" type="number" placeholder="Estatura (cm)" required>
-                <input name="peso" type="number" step="0.1" placeholder="Peso (kg)" required>
-                
-                <select name="sexo">
-                    <option value="Masculino">Hombre</option>
-                    <option value="Femenino">Mujer</option>
-                </select>
-
-                <select name="objetivo">
-                    <option value="Perder PESO">Perder PESO</option>
-                    <option value="Ganar MÚSCULO">Ganar MÚSCULO</option>
-                </select>
-
-                <textarea name="padecimientos" placeholder="Lesiones o padecimientos (opcional)"></textarea>
-
-                <input name="password" type="password" placeholder="Contraseña" required>
-                <button>COMENZAR</button>
+            ${err}
+            <form action="/login" method="POST" onsubmit="showSpin('ENTRANDO...')">
+                <input name="nombre" placeholder="Usuario" required autocomplete="username">
+                <input name="password" type="password" placeholder="Contraseña" required autocomplete="current-password">
+                <button type="submit">ENTRAR</button>
             </form>
-            <button onclick="document.getElementById('reg').style.display='none'" style="background:none; color:#777; font-size:0.8rem;">Cerrar</button>
+            <button class="lnk" onclick="document.getElementById('modal-reg').classList.add('open')">
+                ¿No tienes cuenta? Crear una →
+            </button>
         </div>
-    </body></html>`);
-});
-app.get('/dashboard', async (req, res) => {
-    const user = await getUsuario(req);
-    if (!user) return res.redirect('/');
-    const { data: notas } = await supabase.from('notas').select('*').eq('usuario_id', user.id).order('fecha', { ascending: false });
-
-    res.send(`<html><head><style>${styles}</style></head><body>
-        <div class="sidebar" id="sidebar">
-            <h2 style="color:var(--accent);">Ajustes</h2>
-            <button onclick="document.body.classList.toggle('zoom-mode')">🔍 Zoom +/-</button>
-            <div class="audio-panel">
-                <p style="color:var(--accent); font-size:0.8rem; margin-bottom:10px;">🎧 NARRACIÓN</p>
-                <button onclick="leer()" style="padding:8px; font-size:0.8rem;">🔊 Escuchar Plan</button>
-            </div>
-            <form action="/logout" method="POST" style="margin-top:20px;">
-                <button style="background:var(--danger); color:white;">Cerrar Sesión</button>
-            </form>
-        </div>
-
-        <div class="navbar">
-            <button class="menu-btn" onclick="document.getElementById('sidebar').classList.toggle('active')">☰</button>
-            <h3>EN-FORMA AI</h3>
-            <div style="width:40px;"></div>
-        </div>
-        
-        <div class="app-container">
-            <div class="card" style="border-left:5px solid var(--accent);">
-                <h2>Plan Personalizado: ${user.nombre}</h2>
-                <div id="rutina">${user.consejo_ia}</div>
-            </div>
-
-            <div class="card">
-                <h3>Diario de Entrenamiento</h3>
-                <form action="/guardar-nota" method="POST">
-                    <textarea name="contenido" placeholder="¿Cómo fue el entreno de hoy?" required></textarea>
-                    <button>Guardar Nota</button>
-                </form>
-                <div style="margin-top:20px;">
-                    ${notas?.map(n => `<div style="border-bottom:1px solid #333; padding:10px;"><b>${new Date(n.fecha).toLocaleDateString()}:</b> ${n.contenido}</div>`).join('') || ''}
+    </div>
+ 
+    <!-- MODAL REGISTRO -->
+    <div class="mo" id="modal-reg">
+        <div class="mb2">
+            <div class="mo-t">NUEVA CUENTA</div>
+            ${regErr}
+            <form action="/registrar" method="POST" onsubmit="showSpin('GENERANDO TU RUTINA CON IA...')">
+                <label>Nombre de usuario</label>
+                <input name="nombre" placeholder="Ej: carlos92" required>
+ 
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                    <div>
+                        <label>Edad</label>
+                        <input name="edad" type="number" min="10" max="100" placeholder="25" required>
+                    </div>
+                    <div>
+                        <label>Sexo</label>
+                        <select name="sexo">
+                            <option value="Masculino">Hombre</option>
+                            <option value="Femenino">Mujer</option>
+                        </select>
+                    </div>
                 </div>
+ 
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                    <div>
+                        <label>Peso (kg)</label>
+                        <input name="peso" type="number" step="0.1" min="30" max="300" placeholder="70" required>
+                    </div>
+                    <div>
+                        <label>Estatura (cm)</label>
+                        <input name="estatura" type="number" min="100" max="250" placeholder="175" required>
+                    </div>
+                </div>
+ 
+                <label>Objetivo</label>
+                <select name="objetivo">
+                    <option value="Perder PESO">🔥 Perder PESO</option>
+                    <option value="Ganar MÚSCULO">💪 Ganar MÚSCULO</option>
+                    <option value="Mejorar RESISTENCIA">🏃 Mejorar RESISTENCIA</option>
+                    <option value="Tonificar el CUERPO">✨ Tonificar el CUERPO</option>
+                    <option value="Mantenerse en FORMA">⚡ Mantenerse en FORMA</option>
+                </select>
+ 
+                <label>Lesiones o padecimientos (opcional)</label>
+                <textarea name="padecimientos" placeholder="Ej: hernia discal L4-L5, dolor de rodilla derecha, hipertensión..."></textarea>
+ 
+                <label>Contraseña</label>
+                <input name="password" type="password" placeholder="Mínimo 6 caracteres" required minlength="6">
+ 
+                <button type="submit" style="margin-top:6px;">🤖 CREAR CUENTA Y GENERAR RUTINA</button>
+            </form>
+            <button class="sec" style="margin-top:10px;" onclick="document.getElementById('modal-reg').classList.remove('open')">Cancelar</button>
+        </div>
+    </div>
+ 
+    <div class="spin-overlay" id="spinner">
+        <div class="spin"></div>
+        <div class="spin-t" id="spinMsg">PROCESANDO...</div>
+        <div class="spin-sub">Esto puede tardar unos segundos</div>
+    </div>
+ 
+    <script>
+    function showSpin(msg) {
+        document.getElementById('spinMsg').textContent = msg || 'PROCESANDO...';
+        document.getElementById('spinner').classList.add('show');
+    }
+    // Cerrar modal clicando fuera
+    document.getElementById('modal-reg').addEventListener('click', function(e) {
+        if (e.target === this) this.classList.remove('open');
+    });
+    </script>
+    `));
+});
+ 
+// ─── GET /dashboard ──────────────────────────────────────────
+app.get('/dashboard', async (req, res) => {
+    const user = await getUser(req);
+    if (!user) return res.redirect('/');
+ 
+    const { data: notas } = await supabase
+        .from('notas')
+        .select('*')
+        .eq('usuario_id', user.id)
+        .order('fecha', { ascending: false });
+ 
+    const notasArr = notas || [];
+    const imc = calcIMC(user.peso, user.estatura);
+    const imcInfo = infoIMC(imc);
+    const rangoInfo = infoRango(notasArr.length);
+    const historial = Array.isArray(user.historial_peso) ? user.historial_peso : [];
+ 
+    // Historial de peso HTML
+    const histHTML = historial.length > 0
+        ? historial.slice().reverse().map(h =>
+            `<div class="hi"><span class="hi-f">${h.fecha}</span><span class="hi-v">${h.peso} kg</span></div>`
+          ).join('')
+        : `<p style="color:var(--muted);font-size:.85em;padding:8px 0;">Aún no has registrado cambios de peso.</p>`;
+ 
+    // Notas HTML
+    const notasHTML = notasArr.length > 0
+        ? notasArr.slice(0, 20).map(n =>
+            `<div class="ni">
+                <div class="ni-f">${new Date(n.fecha).toLocaleDateString('es-ES', { weekday:'long', year:'numeric', month:'long', day:'numeric' })}</div>
+                <div>${n.contenido}</div>
+            </div>`
+          ).join('')
+        : `<p style="color:var(--muted);font-size:.85em;padding:8px 0;">Tu diario está vacío. ¡Empieza a registrar tus entrenos!</p>`;
+ 
+    // Rutina content
+    const rutinaContent = user.consejo_ia
+        ? user.consejo_ia
+        : `<p style="color:var(--muted);">No se pudo generar la rutina. Usa el botón de abajo para generarla ahora.</p>`;
+ 
+    res.send(page(`
+    <!-- TOPBAR -->
+    <div class="topbar">
+        <div class="topbar-brand">EN-FORMA AI</div>
+        <div class="topbar-actions">
+            <button class="tbtn" id="btnModo" onclick="toggleModo()">MODO: NORMAL</button>
+            <button class="tbtn" id="btnZoom" onclick="toggleZoom()">ZOOM: OFF</button>
+            <form action="/logout" method="POST" style="display:inline;">
+                <button type="submit" class="tbtn red">SALIR</button>
+            </form>
+        </div>
+    </div>
+ 
+    <div class="wrap">
+ 
+        <!-- SALUDO -->
+        <div class="greeting">Hola, <span>${user.nombre}</span> 👋</div>
+ 
+        <!-- STATS 2x2 -->
+        <div class="stats">
+            <div class="sc">
+                <div class="si">⚖️</div>
+                <div class="sl">PESO registrado</div>
+                <div class="sv" style="color:var(--accent2);">${user.peso} <small style="font-size:.6em;">kg</small></div>
+                <div class="ss">${user.estatura} cm de estatura</div>
+            </div>
+            <div class="sc">
+                <div class="si">🎯</div>
+                <div class="sl">Tu meta</div>
+                <div class="sv" style="color:var(--accent);font-size:1.2em;">${user.objetivo}</div>
+                <div class="ss">${user.sexo}</div>
+            </div>
+            <div class="sc">
+                <div class="si">🏅</div>
+                <div class="sl">Tu rango</div>
+                <div class="sv" style="color:${rangoInfo.color};">${rangoInfo.label}</div>
+                <div class="ricons">${rangoInfo.icons}</div>
+            </div>
+            <div class="sc">
+                <div class="si">❤️</div>
+                <div class="sl">Índice de salud (IMC)</div>
+                <div class="sv" style="color:${imcInfo.color};">${imc}</div>
+                <div class="ss">Estado: ${imcInfo.label}</div>
+                <div class="imc-bar"><div class="imc-fill" style="width:${imcInfo.pct}%;background:${imcInfo.color};"></div></div>
             </div>
         </div>
-
-        <script>
-            function leer() {
-                const s = window.speechSynthesis;
-                const u = new SpeechSynthesisUtterance(document.getElementById('rutina').innerText);
-                u.lang = 'es-ES';
-                u.rate = 0.9;
-                s.speak(u);
-            }
-        </script>
-    </body></html>`);
+ 
+        <!-- EVOLUCIÓN DE PESO -->
+        <div class="acc">
+            <div class="acc-h" onclick="toggleAcc('hist-body')">
+                📈 EVOLUCIÓN DEL PESO
+                <span class="arr">▼</span>
+            </div>
+            <div class="acc-b" id="hist-body">
+                <form action="/actualizar-peso" method="POST" onsubmit="showSpin('GUARDANDO PESO...')">
+                    <div class="prow">
+                        <input name="peso" type="number" step="0.1" min="30" max="300" placeholder="Nuevo peso (kg)" required>
+                        <button type="submit" class="orange">Registrar</button>
+                    </div>
+                </form>
+                <div class="hist">${histHTML}</div>
+            </div>
+        </div>
+ 
+        <!-- CONFIGURACIÓN -->
+        <div class="acc">
+            <div class="acc-h" onclick="toggleAcc('config-body')">
+                ⚙️ CONFIGURACIÓN Y HERRAMIENTAS
+                <span class="arr">▼</span>
+            </div>
+            <div class="acc-b" id="config-body">
+ 
+                <!-- TTS -->
+                <div class="card-t" style="border:none;padding:0;margin-bottom:10px;font-size:.9em;">🎙️ NARRACIÓN</div>
+                <select id="voiceSelect" onchange="updateVoice()"></select>
+                <div class="voice-row">
+                    <div class="vb on" id="vb-m" onclick="selectVoz('m')">👨 Entrenador</div>
+                    <div class="vb" id="vb-f" onclick="selectVoz('f')">👩 Entrenadora</div>
+                </div>
+                <div class="brow" style="margin-top:10px;">
+                    <button onclick="leer()" class="sec">▶ Escuchar Plan</button>
+                    <button onclick="detener()" class="sec">⏹ Detener</button>
+                </div>
+ 
+                <div class="div"></div>
+ 
+                <!-- MÚSICA -->
+                <div class="card-t" style="border:none;padding:0;margin-bottom:10px;font-size:.9em;">🎧 MÚSICA AMBIENTE</div>
+                <div class="mbgrid">
+                    <div class="mb" id="mb-feng" onclick="playMusic('feng')">🌿 Feng Shui / Yoga</div>
+                    <div class="mb" id="mb-clasica" onclick="playMusic('clasica')">🎻 Clásica</div>
+                    <div class="mb" id="mb-rock" onclick="playMusic('rock')">🎸 Rock Motivado</div>
+                    <div class="mb" id="mb-silencio" onclick="playMusic('silencio')">🔇 Silencio</div>
+                </div>
+                <div style="color:var(--muted);font-size:.72em;margin-top:8px;text-align:center;">
+                    Volumen:
+                    <input type="range" id="volSlider" min="0" max="100" value="30" 
+                           style="width:120px;height:4px;margin:0 8px;background:#333;border:none;padding:0;margin-bottom:0;display:inline-block;vertical-align:middle;"
+                           oninput="setVol(this.value)">
+                    <span id="volVal">30%</span>
+                </div>
+ 
+            </div>
+        </div>
+ 
+        <!-- RUTINA IA -->
+        <div class="card hl">
+            <div class="card-t">
+                🤖 TU PLAN PERSONALIZADO
+                <form action="/regenerar" method="POST" style="display:inline;" onsubmit="showSpin('GENERANDO NUEVA RUTINA CON IA...')">
+                    <button type="submit" class="orange" style="width:auto;padding:7px 14px;font-size:.75em;letter-spacing:.5px;">🔄 Regenerar</button>
+                </form>
+            </div>
+            <div id="rutina" class="rutina">${rutinaContent}</div>
+        </div>
+ 
+        <!-- ACTUALIZAR PERFIL -->
+        <div class="acc">
+            <div class="acc-h" onclick="toggleAcc('perfil-body')">
+                👤 ACTUALIZAR MI PERFIL
+                <span class="arr">▼</span>
+            </div>
+            <div class="acc-b" id="perfil-body">
+                <form action="/actualizar-perfil" method="POST" onsubmit="showSpin('ACTUALIZANDO PERFIL...')">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                        <div>
+                            <label>Peso (kg)</label>
+                            <input name="peso" type="number" step="0.1" value="${user.peso}" required>
+                        </div>
+                        <div>
+                            <label>Estatura (cm)</label>
+                            <input name="estatura" type="number" value="${user.estatura}" required>
+                        </div>
+                    </div>
+                    <label>Objetivo</label>
+                    <select name="objetivo">
+                        <option value="Perder PESO" ${user.objetivo === 'Perder PESO' ? 'selected' : ''}>🔥 Perder PESO</option>
+                        <option value="Ganar MÚSCULO" ${user.objetivo === 'Ganar MÚSCULO' ? 'selected' : ''}>💪 Ganar MÚSCULO</option>
+                        <option value="Mejorar RESISTENCIA" ${user.objetivo === 'Mejorar RESISTENCIA' ? 'selected' : ''}>🏃 Mejorar RESISTENCIA</option>
+                        <option value="Tonificar el CUERPO" ${user.objetivo === 'Tonificar el CUERPO' ? 'selected' : ''}>✨ Tonificar el CUERPO</option>
+                        <option value="Mantenerse en FORMA" ${user.objetivo === 'Mantenerse en FORMA' ? 'selected' : ''}>⚡ Mantenerse en FORMA</option>
+                    </select>
+                    <label>Lesiones / Padecimientos</label>
+                    <textarea name="padecimientos" placeholder="Actualiza tus lesiones o padecimientos...">${user.padecimientos || ''}</textarea>
+                    <div class="brow">
+                        <button type="submit" class="sec">💾 Guardar cambios</button>
+                        <button type="submit" name="regenerar" value="1" class="orange">💾 Guardar + Nueva rutina</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+ 
+        <!-- DIARIO -->
+        <div class="card hl2">
+            <div class="card-t">📓 DIARIO DE ENTRENAMIENTO</div>
+            <form action="/guardar-nota" method="POST" onsubmit="showSpin('GUARDANDO NOTA...')">
+                <textarea name="contenido" placeholder="¿Cómo fue el entreno de hoy? Anota tus series, cómo te sentiste, tu progreso..." required></textarea>
+                <button type="submit">💾 Guardar entrada</button>
+            </form>
+            <div class="div"></div>
+            <div class="notas-list">${notasHTML}</div>
+        </div>
+ 
+    </div><!-- /wrap -->
+ 
+    <!-- SPINNER -->
+    <div class="spin-overlay" id="spinner">
+        <div class="spin"></div>
+        <div class="spin-t" id="spinMsg">PROCESANDO...</div>
+        <div class="spin-sub">Un momento por favor</div>
+    </div>
+ 
+    <script>
+    // ── ZOOM ──────────────────────────────────────────────────
+    let zoomOn = false;
+    function toggleZoom() {
+        zoomOn = !zoomOn;
+        document.body.classList.toggle('zoom-mode', zoomOn);
+        const b = document.getElementById('btnZoom');
+        b.textContent = 'ZOOM: ' + (zoomOn ? 'ON' : 'OFF');
+        b.classList.toggle('on', zoomOn);
+    }
+ 
+    // ── MODO (oscuro/ultra oscuro) ────────────────────────────
+    let modoNight = false;
+    function toggleModo() {
+        modoNight = !modoNight;
+        document.documentElement.style.setProperty('--bg', modoNight ? '#000' : '#090910');
+        document.documentElement.style.setProperty('--card', modoNight ? '#0a0a0a' : '#111118');
+        const b = document.getElementById('btnModo');
+        b.textContent = 'MODO: ' + (modoNight ? 'NOCHE' : 'NORMAL');
+        b.classList.toggle('on', modoNight);
+    }
+ 
+    // ── ACCORDION ─────────────────────────────────────────────
+    function toggleAcc(id) {
+        const b = document.getElementById(id);
+        b.classList.toggle('open');
+        const arr = b.previousElementSibling.querySelector('.arr');
+        if (arr) arr.textContent = b.classList.contains('open') ? '▲' : '▼';
+    }
+ 
+    // ── SPINNER ───────────────────────────────────────────────
+    function showSpin(msg) {
+        document.getElementById('spinMsg').textContent = msg || 'PROCESANDO...';
+        document.getElementById('spinner').classList.add('show');
+    }
+ 
+    // ── TTS ───────────────────────────────────────────────────
+    let voices = [];
+    let selectedVoice = null;
+    let vocesMasculinas = [];
+    let vocesFemeninas = [];
+    let modoVoz = 'm';
+ 
+    function loadVoices() {
+        voices = window.speechSynthesis.getVoices();
+        const esp = voices.filter(v => v.lang.startsWith('es') || v.lang.startsWith('Es'));
+        vocesMasculinas = esp.filter(v => /male|hombre|diego|pablo|jorge|miguel/i.test(v.name));
+        vocesFemeninas = esp.filter(v => /female|mujer|marta|laura|paulina|Monica|helena/i.test(v.name));
+ 
+        const sel = document.getElementById('voiceSelect');
+        sel.innerHTML = '';
+        esp.forEach((v, i) => {
+            const opt = document.createElement('option');
+            opt.value = i;
+            opt.textContent = v.name + ' (' + v.lang + ')';
+            sel.appendChild(opt);
+        });
+        updateVoice();
+    }
+ 
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+    setTimeout(loadVoices, 300);
+ 
+    function selectVoz(genero) {
+        modoVoz = genero;
+        document.getElementById('vb-m').classList.toggle('on', genero === 'm');
+        document.getElementById('vb-f').classList.toggle('on', genero === 'f');
+        updateVoice();
+    }
+ 
+    function updateVoice() {
+        const sel = document.getElementById('voiceSelect');
+        const esp = voices.filter(v => v.lang.startsWith('es') || v.lang.startsWith('Es'));
+        if (modoVoz === 'm' && vocesMasculinas.length > 0) {
+            selectedVoice = vocesMasculinas[0];
+            const idx = esp.findIndex(v => v.name === selectedVoice.name);
+            if (idx >= 0) sel.value = idx;
+        } else if (modoVoz === 'f' && vocesFemeninas.length > 0) {
+            selectedVoice = vocesFemeninas[0];
+            const idx = esp.findIndex(v => v.name === selectedVoice.name);
+            if (idx >= 0) sel.value = idx;
+        } else {
+            const idx = parseInt(sel.value);
+            const esp2 = voices.filter(v => v.lang.startsWith('es'));
+            selectedVoice = esp2[idx] || null;
+        }
+    }
+ 
+    function leer() {
+        const s = window.speechSynthesis;
+        s.cancel();
+        const text = document.getElementById('rutina').innerText;
+        if (!text.trim()) return;
+        const u = new SpeechSynthesisUtterance(text);
+        const sel = document.getElementById('voiceSelect');
+        const esp = voices.filter(v => v.lang.startsWith('es'));
+        u.voice = esp[parseInt(sel.value)] || selectedVoice;
+        u.lang = 'es-ES';
+        u.rate = 0.88;
+        u.pitch = modoVoz === 'm' ? 0.85 : 1.1;
+        s.speak(u);
+    }
+ 
+    function detener() {
+        window.speechSynthesis.cancel();
+    }
+ 
+    // ── MÚSICA ────────────────────────────────────────────────
+    let audio = null;
+    let currentMusic = null;
+ 
+    const streams = {
+        feng:    'https://streams.ilovemusic.de/iloveradio17.mp3',
+        clasica: 'https://live.musopen.org:8085/streamvbr0',
+        rock:    'https://streams.ilovemusic.de/iloveradio2.mp3'
+    };
+ 
+    function playMusic(style) {
+        document.querySelectorAll('.mb').forEach(b => b.classList.remove('on'));
+ 
+        if (audio) { audio.pause(); audio = null; }
+ 
+        if (style === 'silencio' || style === currentMusic) {
+            currentMusic = null;
+            document.getElementById('mb-silencio').classList.add('on');
+            return;
+        }
+ 
+        document.getElementById('mb-' + style)?.classList.add('on');
+        currentMusic = style;
+ 
+        if (streams[style]) {
+            audio = new Audio(streams[style]);
+            audio.volume = parseInt(document.getElementById('volSlider').value) / 100;
+            audio.loop = true;
+            audio.play().catch(e => console.log('Audio bloqueado por el navegador:', e));
+        }
+    }
+ 
+    function setVol(v) {
+        document.getElementById('volVal').textContent = v + '%';
+        if (audio) audio.volume = v / 100;
+    }
+    </script>
+    `));
 });
-
+ 
+// ─── POST /login ──────────────────────────────────────────────
+app.post('/login', async (req, res) => {
+    try {
+        const { nombre, password } = req.body;
+        const { data: u } = await supabase.from('usuarios').select('*').eq('nombre', nombre).single();
+        if (u && await bcrypt.compare(password, u.password)) {
+            res.setHeader('Set-Cookie', `uid=${u.id}; Path=/; HttpOnly; Max-Age=604800`);
+            return res.redirect('/dashboard');
+        }
+        res.redirect('/?err=1');
+    } catch (e) {
+        console.error('Login error:', e);
+        res.redirect('/?err=1');
+    }
+});
+ 
+// ─── POST /registrar ──────────────────────────────────────────
 app.post('/registrar', async (req, res) => {
     try {
-        // 1. Recogemos todos los campos nuevos
         const { nombre, edad, peso, estatura, password, objetivo, sexo, padecimientos } = req.body;
+ 
+        // Verificar que el usuario no exista
+        const { data: existe } = await supabase.from('usuarios').select('id').eq('nombre', nombre).single();
+        if (existe) {
+            return res.redirect('/?regerr=' + encodeURIComponent('Ese nombre de usuario ya existe.'));
+        }
+ 
         const hashed = await bcrypt.hash(password, 10);
-
-        // 2. Prompt mejorado para la IA (incluye sexo y lesiones)
-        const p = `Eres un entrenador experto. Crea una rutina fitness en HTML (usa <b>, <br>, <ul>, <li>) para ${nombre}. 
-        Perfil: ${sexo}, ${edad} años, ${peso}kg, ${estatura}cm. 
-        Objetivo: ${objetivo}. 
-        Restricciones médicas: ${padecimientos || 'Ninguna'}. 
-        Sé motivador y directo.`;
-
-        const consejo = await llamarGroq(p);
-
-        // 3. Guardamos TODO en la base de datos
+        const userObj = { nombre, edad: parseInt(edad), peso: parseFloat(peso), estatura: parseInt(estatura), sexo, objetivo, padecimientos, password: hashed };
+ 
+        const consejo = await llamarGroq(buildPrompt(userObj));
+ 
         const { data, error } = await supabase.from('usuarios').insert([{
-            nombre, edad, peso, estatura, sexo, padecimientos, password: hashed, objetivo, consejo_ia: consejo
+            ...userObj,
+            consejo_ia: consejo || 'Usa el botón Regenerar para generar tu rutina.',
+            historial_peso: [{ peso: parseFloat(peso), fecha: new Date().toISOString().split('T')[0] }]
         }]).select();
-
+ 
         if (error) throw error;
-
-        res.setHeader('Set-Cookie', `uid=${data[0].id}; Path=/; HttpOnly; Max-Age=86400`);
+ 
+        res.setHeader('Set-Cookie', `uid=${data[0].id}; Path=/; HttpOnly; Max-Age=604800`);
         res.redirect('/dashboard');
-    } catch (e) { 
-        console.error(e);
-        res.send("Error en el registro: " + e.message); 
+    } catch (e) {
+        console.error('Registro error:', e);
+        res.redirect('/?regerr=' + encodeURIComponent('Error en el registro: ' + e.message));
     }
 });
-
-app.post('/login', async (req, res) => {
-    const { nombre, password } = req.body;
-    const { data: u } = await supabase.from('usuarios').select('*').eq('nombre', nombre).single();
-    if (u && await bcrypt.compare(password, u.password)) {
-        res.setHeader('Set-Cookie', `uid=${u.id}; Path=/; HttpOnly; Max-Age=86400`);
-        return res.redirect('/dashboard');
-    }
-    res.send("Usuario o clave incorrecta");
-});
-
-app.post('/guardar-nota', async (req, res) => {
-    const user = await getUsuario(req);
-    if (user) {
-        await supabase.from('notas').insert([{ usuario_id: user.id, contenido: req.body.contenido }]);
+ 
+// ─── POST /regenerar ──────────────────────────────────────────
+app.post('/regenerar', async (req, res) => {
+    const user = await getUser(req);
+    if (!user) return res.redirect('/');
+    const consejo = await llamarGroq(buildPrompt(user));
+    if (consejo) {
+        await supabase.from('usuarios').update({ consejo_ia: consejo }).eq('id', user.id);
     }
     res.redirect('/dashboard');
 });
-
+ 
+// ─── POST /actualizar-peso ────────────────────────────────────
+app.post('/actualizar-peso', async (req, res) => {
+    const user = await getUser(req);
+    if (!user) return res.redirect('/');
+ 
+    const nuevoPeso = parseFloat(req.body.peso);
+    if (isNaN(nuevoPeso)) return res.redirect('/dashboard');
+ 
+    const historial = Array.isArray(user.historial_peso) ? user.historial_peso : [];
+    historial.push({ peso: nuevoPeso, fecha: new Date().toISOString().split('T')[0] });
+    if (historial.length > 50) historial.splice(0, historial.length - 50);
+ 
+    await supabase.from('usuarios').update({ peso: nuevoPeso, historial_peso: historial }).eq('id', user.id);
+    res.redirect('/dashboard');
+});
+ 
+// ─── POST /actualizar-perfil ──────────────────────────────────
+app.post('/actualizar-perfil', async (req, res) => {
+    const user = await getUser(req);
+    if (!user) return res.redirect('/');
+ 
+    const updates = {
+        peso:        parseFloat(req.body.peso) || user.peso,
+        estatura:    parseInt(req.body.estatura) || user.estatura,
+        objetivo:    req.body.objetivo || user.objetivo,
+        padecimientos: req.body.padecimientos || ''
+    };
+ 
+    // Si el peso cambió, agregarlo al historial
+    if (updates.peso !== user.peso) {
+        const historial = Array.isArray(user.historial_peso) ? user.historial_peso : [];
+        historial.push({ peso: updates.peso, fecha: new Date().toISOString().split('T')[0] });
+        updates.historial_peso = historial;
+    }
+ 
+    // Si solicitó regenerar rutina
+    if (req.body.regenerar === '1') {
+        const mergedUser = { ...user, ...updates };
+        const consejo = await llamarGroq(buildPrompt(mergedUser));
+        if (consejo) updates.consejo_ia = consejo;
+    }
+ 
+    await supabase.from('usuarios').update(updates).eq('id', user.id);
+    res.redirect('/dashboard');
+});
+ 
+// ─── POST /guardar-nota ───────────────────────────────────────
+app.post('/guardar-nota', async (req, res) => {
+    const user = await getUser(req);
+    if (user && req.body.contenido?.trim()) {
+        await supabase.from('notas').insert([{
+            usuario_id: user.id,
+            contenido: req.body.contenido.trim()
+        }]);
+    }
+    res.redirect('/dashboard');
+});
+ 
+// ─── POST /logout ─────────────────────────────────────────────
 app.post('/logout', (req, res) => {
-    res.setHeader('Set-Cookie', 'uid=; Path=/; Max-Age=0');
+    res.setHeader('Set-Cookie', 'uid=; Path=/; Max-Age=0; HttpOnly');
     res.redirect('/');
 });
-
-app.listen(PORT, '0.0.0.0', () => console.log('Servidor activo en puerto ' + PORT));
-
+ 
+// ─── START ───────────────────────────────────────────────────
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`EN-FORMA AI corriendo en puerto ${PORT}`);
+});
