@@ -827,7 +827,7 @@ app.get('/dashboard', async (req, res) => {
                     <div style="font-size:.78em;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px;">🖥️ Pantalla</div>
                     <div class="brow">
                         <button class="sec tbtn" id="btnZoom2" onclick="toggleZoom()" style="width:auto;flex:1;border-radius:8px;padding:9px;">ZOOM: OFF</button>
-                        <button class="sec tbtn" id="btnModo2" onclick="toggleModo()" style="width:auto;flex:1;border-radius:8px;padding:9px;">MODO: NORMAL</button>
+                        <button class="sec tbtn" id="btnModo2" onclick="toggleModo()" style="width:auto;flex:1;border-radius:8px;padding:9px;">AHORRO: OFF</button>
                     </div>
                 </div>
             </div>
@@ -904,7 +904,6 @@ app.get('/dashboard', async (req, res) => {
         <!-- STATS 2x2 -->
         <div class="stats">
             <div class="sc">
-                <div class="si">⚖️</div>
                 <div class="sl">PESO registrado</div>
                 <div class="sv" style="color:var(--accent2);">${user.peso} <small style="font-size:.6em;">kg</small></div>
                 <div class="ss">${user.estatura} cm de estatura</div>
@@ -1011,15 +1010,35 @@ app.get('/dashboard', async (req, res) => {
         if (b2) { b2.textContent = label; b2.classList.toggle('on', zoomOn); }
     }
 
-    // ── MODO ──────────────────────────────────────────────────
-    let modoNight = false;
+    // ── MODO AHORRO ───────────────────────────────────────────
+    let modoAhorro = false;
+    const fontLink = document.querySelector('link[href*="fonts.googleapis"]');
+
     function toggleModo() {
-        modoNight = !modoNight;
-        document.documentElement.style.setProperty('--bg', modoNight ? '#000' : '#090910');
-        document.documentElement.style.setProperty('--card', modoNight ? '#0a0a0a' : '#111118');
-        const label = 'MODO: ' + (modoNight ? 'NOCHE' : 'NORMAL');
+        modoAhorro = !modoAhorro;
+        const label = 'AHORRO: ' + (modoAhorro ? 'ON' : 'OFF');
         const b2 = document.getElementById('btnModo2');
-        if (b2) { b2.textContent = label; b2.classList.toggle('on', modoNight); }
+        if (b2) { b2.textContent = label; b2.classList.toggle('on', modoAhorro); }
+
+        if (modoAhorro) {
+            // Desactivar fuentes externas
+            if (fontLink) fontLink.disabled = true;
+            // Desactivar animaciones y transiciones
+            const style = document.createElement('style');
+            style.id = 'ahorro-style';
+            style.textContent = '* { animation: none !important; transition: none !important; } body { background-image: none !important; } .topbar { backdrop-filter: none !important; }';
+            document.head.appendChild(style);
+            // Detener música si está sonando
+            if (audio) { audio.pause(); audio = null; currentMusic = null; }
+            document.querySelectorAll('.mb').forEach(b => b.classList.remove('on'));
+            // Detener TTS
+            window.speechSynthesis.cancel();
+        } else {
+            // Restaurar todo
+            if (fontLink) fontLink.disabled = false;
+            const s = document.getElementById('ahorro-style');
+            if (s) s.remove();
+        }
     }
 
     // ── ACCORDION (main) ──────────────────────────────────────
