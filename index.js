@@ -27,6 +27,7 @@ app.use((req, res, next) => {
 // ─── GROQ IA ─────────────────────────────────────────────────
 async function llamarGroq(prompt) {
     try {
+        console.log('[GROQ] Llamando API...');
         const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
             method: 'POST',
             headers: {
@@ -36,13 +37,21 @@ async function llamarGroq(prompt) {
             body: JSON.stringify({
                 model: 'llama-3.3-70b-versatile',
                 messages: [{ role: 'user', content: prompt }],
-                max_tokens: 1500
+                max_tokens: 1500,
+                temperature: 0.7
             })
         });
         const data = await res.json();
-        return data?.choices?.[0]?.message?.content || null;
+        console.log('[GROQ] Status:', res.status);
+        if (!res.ok) {
+            console.error('[GROQ] Error respuesta:', JSON.stringify(data));
+            return null;
+        }
+        const content = data?.choices?.[0]?.message?.content;
+        console.log('[GROQ] OK, chars:', content?.length);
+        return content || null;
     } catch (e) {
-        console.error('Error Groq:', e);
+        console.error('[GROQ] Excepción:', e.message);
         return null;
     }
 }
@@ -661,6 +670,35 @@ const page = (content, title = 'EN-FORMA AI') =>
     <title>${title}</title>
     <style>${CSS}</style>
     </head><body>${content}</body></html>`;
+
+// ─── GET /test-ia ─────────────────────────────────────────────
+app.get('/test-ia', async (req, res) => {
+    const key = process.env.GROQ_API_KEY;
+    if (!key) return res.send('❌ GROQ_API_KEY no está configurada en las variables de entorno.');
+
+    try {
+        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${key}`
+            },
+            body: JSON.stringify({
+                model: 'llama-3.3-70b-versatile',
+                messages: [{ role: 'user', content: 'Di exactamente esto: "Groq funciona correctamente."' }],
+                max_tokens: 50
+            })
+        });
+        const data = await response.json();
+        if (!response.ok) {
+            return res.send(`❌ Error ${response.status}: ${JSON.stringify(data)}`);
+        }
+        const msg = data?.choices?.[0]?.message?.content;
+        res.send(`✅ Groq responde: "${msg}" — Key: ...${key.slice(-6)}`);
+    } catch (e) {
+        res.send(`❌ Excepción: ${e.message}`);
+    }
+});
 
 // ─── GET / ─────────────────────────────────────────────────────
 app.get('/', async (req, res) => {
