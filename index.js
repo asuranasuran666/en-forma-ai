@@ -985,9 +985,12 @@ app.get('/dashboard', async (req, res) => {
                         <button type="submit" class="orange">Registrar</button>
                     </div>
                 </form>
-                ${historial.length > 1 ? `
-                <canvas id="pesoChart" style="width:100%;max-height:180px;margin-top:8px;"></canvas>
-                ` : ''}
+                ${historial.length >= 1 ? `
+                <div style="position:relative;margin-top:12px;margin-bottom:8px;">
+                    <canvas id="pesoChart" height="140"></canvas>
+                    <div id="chartPlaceholder" style="text-align:center;padding:20px 0;color:var(--muted);font-size:.82em;display:none;">Registra más pesos para ver tu evolución</div>
+                </div>
+                ` : `<p style="color:var(--muted);font-size:.82em;padding:8px 0;">Registra tu primer peso para ver la gráfica.</p>`}
                 <div class="hist">${histHTML}</div>
             </div>
         </div>
@@ -1107,6 +1110,14 @@ app.get('/dashboard', async (req, res) => {
         b.classList.toggle('open');
         const arr = b.previousElementSibling.querySelector('.arr');
         if (arr) arr.textContent = b.classList.contains('open') ? '▲' : '▼';
+        // Cargar gráfica al abrir evolución de peso
+        if (id === 'hist-body' && b.classList.contains('open') && !chartLoaded && histData.length >= 1) {
+            chartLoaded = true;
+            const s = document.createElement('script');
+            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
+            s.onload = () => setTimeout(initChart, 60);
+            document.head.appendChild(s);
+        }
     }
 
     // ── SPINNER ───────────────────────────────────────────────
@@ -1189,7 +1200,7 @@ app.get('/dashboard', async (req, res) => {
     let currentMusic = null;
     const streams = {
         feng:    'https://streams.ilovemusic.de/iloveradio17.mp3',
-        clasica: 'https://live.musopen.org:8085/streamvbr0',
+        clasica: 'https://streaming.radio.co/s3f4e57df4/listen',
         rock:    'https://streams.ilovemusic.de/iloveradio2.mp3'
     };
 
@@ -1218,48 +1229,64 @@ app.get('/dashboard', async (req, res) => {
 
     // ── GRÁFICA DE PESO ────────────────────────────────────────
     const histData = ${JSON.stringify(historial)};
-    if (histData.length > 1 && document.getElementById('pesoChart')) {
-        const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
-        script.onload = function() {
-            const ctx = document.getElementById('pesoChart').getContext('2d');
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: histData.map(h => h.fecha),
-                    datasets: [{
-                        label: 'Peso (kg)',
-                        data: histData.map(h => h.peso),
+    let chartInstance = null;
+    let chartLoaded = false;
+
+    function initChart() {
+        const canvas = document.getElementById('pesoChart');
+        if (!canvas || chartInstance) return;
+        if (histData.length < 2) {
+            canvas.style.display = 'none';
+            const ph = document.getElementById('chartPlaceholder');
+            if (ph) ph.style.display = 'block';
+            return;
+        }
+        if (!window.Chart) return;
+        chartInstance = new Chart(canvas.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: histData.map(h => h.fecha),
+                datasets: [{
+                    label: 'Peso kg',
+                    data: histData.map(h => h.peso),
+                    borderColor: '#00d4ff',
+                    backgroundColor: 'rgba(0,212,255,0.07)',
+                    borderWidth: 2,
+                    pointBackgroundColor: '#ff6600',
+                    pointBorderColor: '#00d4ff',
+                    pointRadius: 5,
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#111118',
                         borderColor: '#00d4ff',
-                        backgroundColor: 'rgba(0,212,255,0.08)',
-                        borderWidth: 2,
-                        pointBackgroundColor: '#00d4ff',
-                        pointRadius: 4,
-                        fill: true,
-                        tension: 0.4
-                    }]
+                        borderWidth: 1,
+                        titleColor: '#00d4ff',
+                        bodyColor: '#dde0ee',
+                        callbacks: { label: ctx => ctx.parsed.y + ' kg' }
+                    }
                 },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            backgroundColor: '#111118',
-                            borderColor: '#00d4ff',
-                            borderWidth: 1,
-                            titleColor: '#00d4ff',
-                            bodyColor: '#dde0ee'
-                        }
+                scales: {
+                    x: {
+                        ticks: { color: '#5a5a7a', font: { size: 10 }, maxRotation: 45 },
+                        grid: { color: 'rgba(255,255,255,0.04)' }
                     },
-                    scales: {
-                        x: { ticks: { color: '#5a5a7a', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
-                        y: { ticks: { color: '#5a5a7a', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } }
+                    y: {
+                        ticks: { color: '#5a5a7a', font: { size: 10 }, callback: v => v + ' kg' },
+                        grid: { color: 'rgba(255,255,255,0.04)' }
                     }
                 }
-            });
-        };
-        document.head.appendChild(script);
+            }
+        });
     }
+
     </script>
     `));
 });
