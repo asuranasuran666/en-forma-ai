@@ -1040,6 +1040,16 @@ app.post('/registrar', async (req, res) => {
     }
 });
  
+app.get('/regenerar', async (req, res) => {
+    const user = await getUser(req);
+    if (!user) return res.redirect('/');
+    const consejo = await llamarGroq(buildPrompt(user));
+    if (consejo) {
+        await supabase.from('usuarios').update({ consejo_ia: consejo }).eq('id', user.id);
+    }
+    res.redirect('/dashboard');
+});
+
 // ─── POST /regenerar ──────────────────────────────────────────
 app.post('/regenerar', async (req, res) => {
     const user = await getUser(req);
