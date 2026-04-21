@@ -295,27 +295,38 @@ body.zoom-mode { font-size: 20px; }
 .greeting span { color: var(--accent); }
 
 /* ── STATS GRID ── */
-.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 16px;
+}
 
 .sc {
     background: var(--card);
     border: 1px solid var(--border2);
     border-top: 2px solid var(--accent);
     border-radius: 14px;
-    padding: 16px 12px;
+    padding: 14px 10px;
     text-align: center;
     transition: border-color .2s;
+    min-width: 0;
 }
 
 .sc:hover { border-top-color: var(--accent); border-color: var(--border); }
-.sc .si { font-size: 1.9em; margin-bottom: 5px; }
-.sc .sl { font-size: .7em; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
-.sc .sv { font-family: 'Rajdhani', sans-serif; font-size: 1.8em; font-weight: 700; line-height: 1; }
-.sc .ss { font-size: .72em; color: var(--muted); margin-top: 4px; }
-.sc .ricons { font-size: 1em; letter-spacing: 3px; margin-top: 5px; }
+.sc .si { font-size: 1.6em; margin-bottom: 4px; }
+.sc .sl { font-size: .62em; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
+.sc .sv { font-family: 'Rajdhani', sans-serif; font-size: 2em; font-weight: 700; line-height: 1; }
+.sc .sv.grande { font-size: 2.6em; }
+.sc .ss { font-size: .7em; color: var(--muted); margin-top: 4px; }
+.sc .ricons { font-size: .85em; letter-spacing: 2px; margin-top: 5px; }
 
-.imc-bar { background: #222; border-radius: 6px; height: 6px; margin-top: 8px; overflow: hidden; }
+.imc-bar { background: #222; border-radius: 6px; height: 5px; margin-top: 8px; overflow: hidden; }
 .imc-fill { height: 100%; border-radius: 6px; transition: width .8s ease; }
+
+@media (max-width: 600px) {
+    .stats { grid-template-columns: repeat(2, 1fr); }
+}
 
 /* ── CARD BASE ── */
 .card {
@@ -416,6 +427,17 @@ button.orange:hover { box-shadow: 0 4px 15px rgba(255,102,0,0.3); }
 .hi-v { color: var(--accent); font-weight: 700; font-family: 'Rajdhani', sans-serif; font-size: 1.1em; }
 
 /* ── NOTAS ── */
+.ni-ejemplo {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border2);
+    border-left: 2px solid var(--accent2);
+    background: rgba(255,102,0,0.04);
+    border-radius: 0 6px 6px 0;
+    margin-bottom: 6px;
+    opacity: 0.75;
+}
+.ni-ejemplo .ni-f { font-size: .72em; color: var(--accent2); margin-bottom: 3px; letter-spacing: .5px; }
+.ni-ejemplo .ni-tag { font-size: .68em; color: var(--accent2); opacity: .7; margin-top: 4px; font-style: italic; }
 .ni { padding: 10px 0; border-bottom: 1px solid var(--border2); }
 .ni-f { font-size: .72em; color: var(--muted); margin-bottom: 3px; letter-spacing: .5px; }
 .notas-list { max-height: 260px; overflow-y: auto; margin-top: 8px; }
@@ -765,6 +787,21 @@ app.get('/dashboard', async (req, res) => {
           ).join('')
         : `<p style="color:var(--muted);font-size:.85em;padding:8px 0;">Aún no has registrado cambios de peso.</p>`;
 
+    const ejemplosNotas = [
+        {
+            fecha: 'EJEMPLO — Día 1',
+            contenido: 'Primera sesión completada 💪 Hice el calentamiento de 5 min y la rutina completa. Las sentadillas me costaron en las últimas reps. Peso usado: 20kg. Me sentí con energía, sin dolor.'
+        },
+        {
+            fecha: 'EJEMPLO — Día 2',
+            contenido: 'Descanso activo. Salí a caminar 30 min a ritmo moderado. Noté que el músculo del cuádriceps está un poco inflamado del día anterior. Mañana retomo la rutina.'
+        },
+        {
+            fecha: 'EJEMPLO — Día 3',
+            contenido: 'Subí el peso en press de banca a 25kg — logré 3x10 sin problema. ¡Progreso real! También medí mi cintura: 82cm. La semana pasada eran 84cm. Voy bien 🔥'
+        }
+    ];
+
     // Notas HTML
     const notasHTML = notasArr.length > 0
         ? notasArr.slice(0, 20).map(n =>
@@ -773,7 +810,14 @@ app.get('/dashboard', async (req, res) => {
                 <div>${n.contenido}</div>
             </div>`
           ).join('')
-        : `<p style="color:var(--muted);font-size:.85em;padding:8px 0;">Tu diario está vacío. ¡Empieza a registrar tus entrenos!</p>`;
+        : `<p style="color:var(--muted);font-size:.8em;padding:6px 0 10px;">Aún no tienes entradas. Aquí van unos ejemplos de cómo usarlo:</p>` +
+          ejemplosNotas.map(e =>
+            `<div class="ni-ejemplo">
+                <div class="ni-f">${e.fecha}</div>
+                <div style="font-size:.88em;line-height:1.5;">${e.contenido}</div>
+                <div class="ni-tag">✦ ejemplo — tus notas reales aparecerán aquí</div>
+            </div>`
+          ).join('');
 
     // Rutina content
     const rutinaContent = user.consejo_ia
@@ -887,26 +931,25 @@ app.get('/dashboard', async (req, res) => {
 
     <!-- TOPBAR -->
     <div class="topbar">
-        <button class="ham" onclick="openSidebar()">☰</button>
+        <div style="display:flex;align-items:center;gap:10px;min-width:0;">
+            <button class="ham" onclick="openSidebar()">☰</button>
+            <span style="font-family:'Rajdhani',sans-serif;font-size:1.1em;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Hola, <span style="color:var(--accent);">${user.nombre}</span> 👋</span>
+        </div>
         <div class="topbar-brand">EN-FORMA AI</div>
         <div class="topbar-actions">
             <form action="/logout" method="POST" style="display:inline;">
-                <button type="submit" class="tbtn red">SALIR</button>
+                <button type="submit" class="tbtn red">CERRAR SESIÓN</button>
             </form>
         </div>
     </div>
 
     <div class="wrap">
 
-        <!-- SALUDO -->
-        <div class="greeting">Hola, <span>${user.nombre}</span> 👋</div>
-
         <!-- STATS 2x2 -->
         <div class="stats">
             <div class="sc">
-                <div class="sl">PESO registrado</div>
-                <div class="sv" style="color:var(--accent2);">${user.peso} <small style="font-size:.6em;">kg</small></div>
-                <div class="ss">${user.estatura} cm de estatura</div>
+                <div class="sl">PESO ACTUAL</div>
+                <div class="sv grande" style="color:var(--accent2);">${user.peso}<small style="font-size:.4em;"> kg</small></div>
             </div>
             <div class="sc">
                 <div class="si">🎯</div>
@@ -942,6 +985,9 @@ app.get('/dashboard', async (req, res) => {
                         <button type="submit" class="orange">Registrar</button>
                     </div>
                 </form>
+                ${historial.length > 1 ? `
+                <canvas id="pesoChart" style="width:100%;max-height:180px;margin-top:8px;"></canvas>
+                ` : ''}
                 <div class="hist">${histHTML}</div>
             </div>
         </div>
@@ -1021,23 +1067,37 @@ app.get('/dashboard', async (req, res) => {
         if (b2) { b2.textContent = label; b2.classList.toggle('on', modoAhorro); }
 
         if (modoAhorro) {
-            // Desactivar fuentes externas
+            // 1. Desactivar fuentes externas (Google Fonts)
             if (fontLink) fontLink.disabled = true;
-            // Desactivar animaciones y transiciones
-            const style = document.createElement('style');
-            style.id = 'ahorro-style';
-            style.textContent = '* { animation: none !important; transition: none !important; } body { background-image: none !important; } .topbar { backdrop-filter: none !important; }';
-            document.head.appendChild(style);
-            // Detener música si está sonando
+            // 2. Fondo negro puro, sin gradientes
+            document.documentElement.style.setProperty('--bg', '#000');
+            document.documentElement.style.setProperty('--card', '#080808');
+            document.documentElement.style.setProperty('--card2', '#0a0a0a');
+            // 3. Quitar animaciones y transiciones
+            const st = document.createElement('style');
+            st.id = 'ahorro-style';
+            st.textContent = '* { animation: none !important; transition: none !important; } body { background-image: none !important; } .topbar { backdrop-filter: none !important; } .sidebar { backdrop-filter: none !important; } .si, .ricons { display: none !important; }';
+            document.head.appendChild(st);
+            // 4. Ocultar emojis decorativos en botones y secciones
+            document.querySelectorAll('.acc-h, .card-t, .sb-section-h').forEach(el => {
+                el.dataset.orig = el.innerHTML;
+                el.innerHTML = el.innerText;
+            });
+            // 5. Detener música y TTS
             if (audio) { audio.pause(); audio = null; currentMusic = null; }
             document.querySelectorAll('.mb').forEach(b => b.classList.remove('on'));
-            // Detener TTS
             window.speechSynthesis.cancel();
         } else {
             // Restaurar todo
             if (fontLink) fontLink.disabled = false;
-            const s = document.getElementById('ahorro-style');
-            if (s) s.remove();
+            document.documentElement.style.removeProperty('--bg');
+            document.documentElement.style.removeProperty('--card');
+            document.documentElement.style.removeProperty('--card2');
+            const st = document.getElementById('ahorro-style');
+            if (st) st.remove();
+            document.querySelectorAll('.acc-h, .card-t, .sb-section-h').forEach(el => {
+                if (el.dataset.orig) el.innerHTML = el.dataset.orig;
+            });
         }
     }
 
@@ -1154,6 +1214,51 @@ app.get('/dashboard', async (req, res) => {
     function setVol(v) {
         document.getElementById('volVal').textContent = v + '%';
         if (audio) audio.volume = v / 100;
+    }
+
+    // ── GRÁFICA DE PESO ────────────────────────────────────────
+    const histData = ${JSON.stringify(historial)};
+    if (histData.length > 1 && document.getElementById('pesoChart')) {
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
+        script.onload = function() {
+            const ctx = document.getElementById('pesoChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: histData.map(h => h.fecha),
+                    datasets: [{
+                        label: 'Peso (kg)',
+                        data: histData.map(h => h.peso),
+                        borderColor: '#00d4ff',
+                        backgroundColor: 'rgba(0,212,255,0.08)',
+                        borderWidth: 2,
+                        pointBackgroundColor: '#00d4ff',
+                        pointRadius: 4,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#111118',
+                            borderColor: '#00d4ff',
+                            borderWidth: 1,
+                            titleColor: '#00d4ff',
+                            bodyColor: '#dde0ee'
+                        }
+                    },
+                    scales: {
+                        x: { ticks: { color: '#5a5a7a', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+                        y: { ticks: { color: '#5a5a7a', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } }
+                    }
+                }
+            });
+        };
+        document.head.appendChild(script);
     }
     </script>
     `));
