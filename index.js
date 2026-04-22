@@ -999,12 +999,12 @@ app.get('/', async (req, res) => {
                 ¿No tienes cuenta? Crear una →
             </button>
         </div>
-        <div style="text-align:center;margin-top:14px;">
-            <a href="/changelog" style="color:var(--muted);font-size:.72em;text-decoration:none;letter-spacing:1px;"
-               onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--muted)'">
-                v1.2.0 — Ver novedades ✨
-            </a>
-        </div>
+    </div>
+    <div style="text-align:center;margin-top:16px;">
+        <a href="/changelog" style="color:var(--muted);font-size:.72em;text-decoration:none;letter-spacing:1px;"
+           onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--muted)'">
+            v1.2.0 — Ver novedades ✨
+        </a>
     </div>
 
     <!-- MODAL REGISTRO -->
@@ -2187,12 +2187,13 @@ app.post('/guardar-nota', async (req, res) => {
 app.post('/enviar-mensaje', async (req, res) => {
     const user = await getUser(req);
     if (!user || !req.body.contenido?.trim()) return res.redirect('/dashboard');
-    await supabase.from('mensajes').insert([{
+    const { error } = await supabase.from('mensajes').insert([{
         usuario_id: user.id,
         contenido: req.body.contenido.trim(),
         es_del_admin: false,
         leido: false
     }]);
+    if (error) console.error('[MENSAJE] Error al insertar:', error.message);
     res.redirect('/dashboard');
 });
 
@@ -2212,12 +2213,15 @@ app.get('/admin', async (req, res) => {
     const user = await getUser(req);
     if (!user || !user.es_admin) return res.redirect('/dashboard');
 
-    const { data: usuarios } = await supabase
-        .from('usuarios').select('id,nombre,edad,peso,objetivo,sexo,created_at')
-        .order('created_at', { ascending: false });
+    const { data: usuarios, error: errU } = await supabase
+        .from('usuarios').select('id,nombre,edad,peso,objetivo,sexo,padecimientos')
+        .order('id', { ascending: false });
 
-    const { data: mensajes } = await supabase
+    const { data: mensajes, error: errM } = await supabase
         .from('mensajes').select('*').order('fecha', { ascending: false });
+
+    if (errU) console.error('[ADMIN] Error usuarios:', errU.message);
+    if (errM) console.error('[ADMIN] Error mensajes:', errM.message);
 
     const usersArr = usuarios || [];
     const msgsArr = mensajes || [];
@@ -2285,7 +2289,7 @@ app.get('/admin', async (req, res) => {
                 <table class="admin-table">
                     <thead>
                         <tr>
-                            <th>Nombre</th><th>Edad</th><th>Peso</th><th>Objetivo</th><th>Sexo</th><th>Registro</th><th>Acción</th>
+                            <th>Nombre</th><th>Edad</th><th>Peso</th><th>Objetivo</th><th>Sexo</th><th>Acción</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -2296,7 +2300,6 @@ app.get('/admin', async (req, res) => {
                             <td>${u.peso} kg</td>
                             <td style="font-size:.82em;">${u.objetivo}</td>
                             <td>${u.sexo}</td>
-                            <td style="font-size:.78em;color:var(--muted);">${u.created_at ? new Date(u.created_at).toLocaleDateString('es-ES') : '—'}</td>
                             <td>
                                 <form action="/admin/eliminar-usuario" method="POST" onsubmit="return confirm('¿Eliminar a ${u.nombre}? Se borrarán todos sus datos.')">
                                     <input type="hidden" name="usuario_id" value="${u.id}">
@@ -2322,7 +2325,8 @@ app.post('/admin/mensaje-global', async (req, res) => {
     const { contenido } = req.body;
     if (!contenido?.trim()) return res.redirect('/admin');
     // Obtener todos los usuarios excepto el admin
-    const { data: usuarios } = await supabase.from('usuarios').select('id').eq('es_admin', false);
+    const { data: usuarios, error: errU2 } = await supabase.from('usuarios').select('id').eq('es_admin', false);
+    if (errU2) console.error('[GLOBAL] Error usuarios:', errU2.message);
     if (usuarios && usuarios.length > 0) {
         const inserts = usuarios.map(u => ({
             usuario_id: u.id,
@@ -2330,7 +2334,8 @@ app.post('/admin/mensaje-global', async (req, res) => {
             es_del_admin: true,
             leido: false
         }));
-        await supabase.from('mensajes').insert(inserts);
+        const { error: errI } = await supabase.from('mensajes').insert(inserts);
+        if (errI) console.error('[GLOBAL] Error insert:', errI.message);
     }
     res.redirect('/admin');
 });
