@@ -56,6 +56,28 @@ async function llamarGroq(prompt) {
     }
 }
 
+function buildPromptDieta(u) {
+    const imc = calcIMC(u.peso, u.estatura);
+    const { label: imcLabel } = infoIMC(imc);
+    return `Eres un nutricionista deportivo y médico. Basándote en el perfil del paciente, crea:
+
+1. UN PLAN DE DIETA REALISTA y específico para su objetivo
+2. RECOMENDACIONES MÉDICAS para sus lesiones o padecimientos (siempre indicando consultar al especialista)
+
+PERFIL:
+- Nombre: ${u.nombre} | Sexo: ${u.sexo} | Edad: ${u.edad} años
+- Peso: ${u.peso}kg | Estatura: ${u.estatura}cm | IMC: ${imc} (${imcLabel})
+- Objetivo: ${u.objetivo}
+- Lesiones/Padecimientos: ${u.padecimientos || 'Ninguno'}
+
+INSTRUCCIONES:
+- La dieta debe ser práctica, con alimentos accesibles y porciones claras
+- Incluye desayuno, almuerzo, merienda y cena de ejemplo
+- Para las lesiones: explica qué alimentos o suplementos pueden ayudar a la recuperación, y qué evitar
+- SIEMPRE añade al final: "⚕️ Consulta a tu médico o especialista antes de hacer cambios en tu alimentación o tratamiento."
+- Responde ÚNICAMENTE en HTML limpio. Solo estas etiquetas: <b>, <br>, <ul>, <li>, <h3>, <p>. Sin estilos inline.`;
+}
+
 // ─── HELPERS ─────────────────────────────────────────────────
 function calcIMC(peso, estatura) {
     return Math.round((peso / Math.pow(estatura / 100, 2)) * 10) / 10;
@@ -320,6 +342,12 @@ body.zoom-mode { font-size: 20px; }
     text-align: center;
     transition: border-color .2s;
     min-width: 0;
+    min-height: 110px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
 }
 
 .sc:hover { border-top-color: var(--accent); border-color: var(--border); }
@@ -371,6 +399,13 @@ body.zoom-mode { font-size: 20px; }
 #rutina ul { padding-left: 18px; margin: 8px 0; }
 #rutina li { margin-bottom: 6px; }
 #rutina p { margin-bottom: 8px; }
+
+#dieta { line-height: 1.75; }
+#dieta b { color: #00ff88; }
+#dieta h3 { color: #00ff88; margin: 14px 0 6px; font-family: 'Rajdhani', sans-serif; font-size: 1.05em; letter-spacing: 1px; text-transform: uppercase; }
+#dieta ul { padding-left: 18px; margin: 8px 0; }
+#dieta li { margin-bottom: 6px; }
+#dieta p { margin-bottom: 8px; }
 
 /* ── INPUTS ── */
 input, select, textarea {
@@ -643,6 +678,95 @@ button.orange:hover { box-shadow: 0 4px 15px rgba(255,102,0,0.3); }
 }
 .spin-sub { color: var(--muted); font-size: .8em; letter-spacing: 1px; }
 
+/* ── CRONÓMETRO ── */
+.crono-wrap {
+    background: var(--card2);
+    border: 1px solid rgba(0,212,255,0.15);
+    border-radius: 16px;
+    padding: 20px;
+    text-align: center;
+    margin-bottom: 14px;
+}
+.crono-display {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 4.5em;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 4px;
+    text-shadow: 0 0 30px rgba(0,212,255,0.3);
+    line-height: 1;
+    margin: 10px 0;
+}
+.crono-display.warning { color: var(--yellow); text-shadow: 0 0 30px rgba(255,204,0,0.4); }
+.crono-display.danger  { color: #ff4444;       text-shadow: 0 0 30px rgba(255,68,68,0.4); animation: pulse .6s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+
+.crono-label { font-size:.75em; color:var(--muted); letter-spacing:2px; text-transform:uppercase; margin-bottom:14px; }
+.crono-preset { display:flex; gap:6px; justify-content:center; flex-wrap:wrap; margin-bottom:14px; }
+.cpbtn {
+    padding:6px 12px; border-radius:20px; font-size:.75em; font-weight:700;
+    background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1);
+    color:var(--muted); cursor:pointer; transition:.2s; width:auto;
+}
+.cpbtn:hover { border-color:var(--accent); color:var(--accent); transform:none; box-shadow:none; }
+.cpbtn.on { background:var(--accent); color:#000; border-color:var(--accent); }
+
+.crono-input-row { display:flex; gap:8px; justify-content:center; align-items:center; margin-bottom:14px; }
+.crono-input-row input { width:70px; text-align:center; font-family:'Rajdhani',sans-serif; font-size:1.2em; margin-bottom:0; }
+.crono-btns { display:flex; gap:8px; justify-content:center; }
+.crono-btns button { width:auto; padding:10px 22px; flex:1; max-width:120px; }
+
+/* ── MENSAJES BADGE ── */
+.msg-btn {
+    position:relative; background:none;
+    border:1px solid rgba(0,212,255,0.2);
+    color:var(--accent); width:38px; height:38px;
+    border-radius:8px; cursor:pointer; font-size:1.1em;
+    display:flex; align-items:center; justify-content:center;
+    transition:.2s; padding:0; flex-shrink:0;
+}
+.msg-btn:hover { background:rgba(0,212,255,0.08); box-shadow:none; transform:none; }
+.msg-badge {
+    position:absolute; top:-6px; right:-6px;
+    background:#ff4444; color:#fff;
+    border-radius:50%; width:18px; height:18px;
+    font-size:.65em; font-weight:700;
+    display:flex; align-items:center; justify-content:center;
+    border:2px solid var(--bg);
+}
+
+/* ── MODAL MENSAJES ── */
+.msg-list { max-height:340px; overflow-y:auto; margin-bottom:14px; }
+.msg-item {
+    padding:10px 12px; border-radius:10px; margin-bottom:8px;
+    font-size:.88em; line-height:1.5;
+}
+.msg-item.del-admin {
+    background:rgba(0,212,255,0.06);
+    border-left:3px solid var(--accent);
+}
+.msg-item.del-user {
+    background:rgba(255,102,0,0.06);
+    border-left:3px solid var(--accent2);
+    text-align:right;
+}
+.msg-item .msg-meta { font-size:.7em; color:var(--muted); margin-bottom:4px; }
+.msg-item.del-admin .msg-meta::before { content:'👨‍💼 Soporte · '; }
+.msg-item.del-user .msg-meta::before  { content:'Tú · '; }
+.msg-empty { color:var(--muted); font-size:.85em; text-align:center; padding:20px 0; }
+
+/* ── ADMIN PANEL ── */
+.admin-wrap { max-width:900px; margin:0 auto; padding:20px 14px 40px; }
+.admin-table { width:100%; border-collapse:collapse; font-size:.88em; }
+.admin-table th { color:var(--accent); font-family:'Rajdhani',sans-serif; letter-spacing:2px; text-transform:uppercase; padding:10px 8px; border-bottom:1px solid var(--border2); text-align:left; }
+.admin-table td { padding:10px 8px; border-bottom:1px solid rgba(255,255,255,0.03); vertical-align:top; }
+.admin-table tr:hover td { background:rgba(255,255,255,0.02); }
+.abtn { padding:5px 10px; font-size:.75em; border-radius:6px; width:auto; cursor:pointer; border:none; font-weight:700; }
+.abtn.red { background:rgba(204,34,34,0.2); color:#ff6666; border:1px solid rgba(204,34,34,0.3); }
+.abtn.red:hover { background:var(--danger); color:#fff; transform:none; box-shadow:none; }
+.abtn.cyan { background:rgba(0,212,255,0.1); color:var(--accent); border:1px solid rgba(0,212,255,0.2); }
+.abtn.cyan:hover { background:var(--accent); color:#000; transform:none; box-shadow:none; }
+
 /* ── DIVIDER ── */
 .div { height: 1px; background: var(--border2); margin: 14px 0; }
 
@@ -670,6 +794,72 @@ const page = (content, title = 'EN-FORMA AI') =>
     <title>${title}</title>
     <style>${CSS}</style>
     </head><body>${content}</body></html>`;
+
+// ─── GET /changelog ───────────────────────────────────────────
+app.get('/changelog', (req, res) => {
+    res.send(page(`
+    <div class="lp" style="align-items:flex-start;padding-top:40px;">
+        <div class="lc" style="max-width:520px;">
+            <div style="text-align:center;margin-bottom:24px;">
+                <div style="font-family:'Rajdhani',sans-serif;font-size:1.8em;color:var(--accent);letter-spacing:4px;font-weight:700;">EN-FORMA AI</div>
+                <div style="color:var(--muted);font-size:.78em;letter-spacing:2px;margin-top:4px;">HISTORIAL DE VERSIONES</div>
+            </div>
+
+            <div style="border-left:2px solid rgba(0,212,255,0.2);padding-left:18px;">
+
+                <div style="margin-bottom:24px;">
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+                        <span style="font-family:'Rajdhani',sans-serif;font-size:1.1em;color:var(--accent);font-weight:700;">v1.2.0</span>
+                        <span style="background:rgba(0,212,255,0.1);color:var(--accent);font-size:.68em;padding:2px 8px;border-radius:20px;letter-spacing:1px;">ACTUAL</span>
+                        <span style="color:var(--muted);font-size:.75em;">Abril 2025</span>
+                    </div>
+                    <ul style="color:var(--text);font-size:.88em;line-height:1.9;padding-left:16px;">
+                        <li>⏱ Cronómetro de entrenamiento con alertas de voz</li>
+                        <li>💬 Sistema de mensajes y soporte al usuario</li>
+                        <li>👑 Panel de administración completo</li>
+                        <li>📢 Mensajes globales a todos los usuarios</li>
+                        <li>🥗 Plan de dieta personalizado con IA</li>
+                        <li>📈 Gráfica de evolución de peso</li>
+                        <li>🎵 Música ambiente mejorada</li>
+                        <li>☰ Menú lateral con configuración completa</li>
+                    </ul>
+                </div>
+
+                <div style="margin-bottom:24px;opacity:.7;">
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+                        <span style="font-family:'Rajdhani',sans-serif;font-size:1.1em;color:var(--muted);font-weight:700;">v1.1.0</span>
+                        <span style="color:var(--muted);font-size:.75em;">Marzo 2025</span>
+                    </div>
+                    <ul style="color:var(--muted);font-size:.85em;line-height:1.9;padding-left:16px;">
+                        <li>🤖 Integración con Groq IA (Llama 3.3 70B)</li>
+                        <li>🏥 IA médica deportiva para lesiones</li>
+                        <li>📓 Diario de entrenamiento</li>
+                        <li>🔊 Narración de rutina por voz (TTS)</li>
+                        <li>⚖️ Historial de peso</li>
+                    </ul>
+                </div>
+
+                <div style="opacity:.5;">
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+                        <span style="font-family:'Rajdhani',sans-serif;font-size:1.1em;color:var(--muted);font-weight:700;">v1.0.0</span>
+                        <span style="color:var(--muted);font-size:.75em;">Febrero 2025</span>
+                    </div>
+                    <ul style="color:var(--muted);font-size:.85em;line-height:1.9;padding-left:16px;">
+                        <li>🚀 Lanzamiento inicial</li>
+                        <li>👤 Registro y login de usuarios</li>
+                        <li>🎨 Diseño oscuro con tema cian</li>
+                    </ul>
+                </div>
+
+            </div>
+
+            <div style="text-align:center;margin-top:24px;">
+                <a href="/" style="color:var(--accent);font-size:.85em;text-decoration:none;">← Volver al inicio</a>
+            </div>
+        </div>
+    </div>
+    `));
+});
 
 // ─── GET /test-ia ─────────────────────────────────────────────
 app.get('/test-ia', async (req, res) => {
@@ -724,6 +914,12 @@ app.get('/', async (req, res) => {
             <button class="lnk" onclick="document.getElementById('modal-reg').classList.add('open')">
                 ¿No tienes cuenta? Crear una →
             </button>
+        </div>
+        <div style="text-align:center;margin-top:14px;">
+            <a href="/changelog" style="color:var(--muted);font-size:.72em;text-decoration:none;letter-spacing:1px;"
+               onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--muted)'">
+                v1.2.0 — Ver novedades ✨
+            </a>
         </div>
     </div>
 
@@ -812,6 +1008,16 @@ app.get('/dashboard', async (req, res) => {
         .eq('usuario_id', user.id)
         .order('fecha', { ascending: false });
 
+    // Mensajes del usuario
+    const { data: mensajes } = await supabase
+        .from('mensajes')
+        .select('*')
+        .eq('usuario_id', user.id)
+        .order('fecha', { ascending: false });
+
+    const mensajesArr = mensajes || [];
+    const noLeidos = mensajesArr.filter(m => m.es_del_admin && !m.leido).length;
+
     const notasArr = notas || [];
     const imc = calcIMC(user.peso, user.estatura);
     const imcInfo = infoIMC(imc);
@@ -895,7 +1101,7 @@ app.get('/dashboard', async (req, res) => {
                     <div class="mbgrid">
                         <div class="mb" id="mb-feng" onclick="playMusic('feng')">🌿 Feng Shui</div>
                         <div class="mb" id="mb-clasica" onclick="playMusic('clasica')">🎻 Clásica</div>
-                        <div class="mb" id="mb-rock" onclick="playMusic('rock')">🎸 Rock</div>
+                        <div class="mb" id="mb-rock" onclick="playMusic('rock')">🎵 Moderno</div>
                         <div class="mb" id="mb-silencio" onclick="playMusic('silencio')">🔇 Silencio</div>
                     </div>
                     <div style="color:var(--muted);font-size:.72em;margin-top:10px;text-align:center;">
@@ -975,8 +1181,39 @@ app.get('/dashboard', async (req, res) => {
         </div>
         <div class="topbar-brand">EN-FORMA AI</div>
         <div class="topbar-actions">
+            <button class="msg-btn" onclick="abrirMensajes()" title="Mensajes y soporte">
+                💬
+                ${noLeidos > 0 ? `<span class="msg-badge">${noLeidos}</span>` : ''}
+            </button>
+            ${user.es_admin ? `<a href="/admin" style="text-decoration:none;"><button class="tbtn" style="background:rgba(255,204,0,0.1);color:#ffcc00;border-color:rgba(255,204,0,0.3);">👑 ADMIN</button></a>` : ''}
             <form action="/logout" method="POST" style="display:inline;">
                 <button type="submit" class="tbtn red">CERRAR SESIÓN</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL MENSAJES -->
+    <div class="mo" id="modal-msg">
+        <div class="mb2" style="max-width:500px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                <div class="mo-t" style="margin-bottom:0;">💬 MENSAJES</div>
+                <button class="sec" style="width:auto;padding:6px 12px;font-size:.8em;" onclick="document.getElementById('modal-msg').classList.remove('open')">✕ Cerrar</button>
+            </div>
+            <div class="msg-list" id="msgList">
+                ${mensajesArr.length === 0
+                    ? `<div class="msg-empty">No tienes mensajes aún.<br>¡Escríbenos si tienes alguna duda!</div>`
+                    : mensajesArr.map(m => `
+                        <div class="msg-item ${m.es_del_admin ? 'del-admin' : 'del-user'}">
+                            <div class="msg-meta">${new Date(m.fecha).toLocaleDateString('es-ES', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</div>
+                            <div>${m.contenido}</div>
+                        </div>`).join('')
+                }
+            </div>
+            <div class="div"></div>
+            <form action="/enviar-mensaje" method="POST" onsubmit="showSpin('ENVIANDO...')">
+                <label>Escribe tu duda, sugerencia o comentario</label>
+                <textarea name="contenido" placeholder="Ej: ¿Puedo cambiar mi objetivo de perder peso a ganar músculo? ¿Cómo funciona la dieta?" required style="min-height:80px;"></textarea>
+                <button type="submit" class="orange">📨 Enviar mensaje</button>
             </form>
         </div>
     </div>
@@ -987,7 +1224,7 @@ app.get('/dashboard', async (req, res) => {
         <div class="stats">
             <div class="sc">
                 <div class="sl">PESO ACTUAL</div>
-                <div class="sv grande" style="color:var(--accent2);">${user.peso}<small style="font-size:.4em;"> kg</small></div>
+                <div class="sv grande" style="color:var(--accent2);display:flex;align-items:baseline;justify-content:center;gap:3px;">${user.peso}<small style="font-size:.35em;">kg</small></div>
             </div>
             <div class="sc">
                 <div class="si">🎯</div>
@@ -1042,6 +1279,48 @@ app.get('/dashboard', async (req, res) => {
                 </form>
             </div>
             <div id="rutina" class="rutina">${rutinaContent}</div>
+        </div>
+
+        <!-- DIETA + RECOMENDACIONES -->
+        <div class="card" style="border-left:3px solid #00ff88;">
+            <div class="card-t" style="color:#00ff88;">
+                🥗 DIETA Y RECOMENDACIONES
+                <form action="/regenerar-dieta" method="POST" style="display:inline;" onsubmit="showSpin('GENERANDO PLAN DE DIETA CON IA...')">
+                    <button type="submit" class="orange" style="width:auto;padding:7px 14px;font-size:.75em;letter-spacing:.5px;">🔄 Generar</button>
+                </form>
+            </div>
+            ${user.dieta_ia
+                ? `<div id="dieta">${user.dieta_ia}</div>`
+                : `<div style="color:var(--muted);font-size:.88em;padding:8px 0;">
+                    Pulsa <b style="color:#00ff88;">Generar</b> para que la IA cree un plan de dieta personalizado 
+                    basado en tu objetivo y perfil, con recomendaciones para tus lesiones si las tienes.
+                   </div>`
+            }
+        </div>
+
+        <!-- CRONÓMETRO -->
+        <div class="crono-wrap">
+            <div class="crono-label">⏱ CRONÓMETRO DE ENTRENAMIENTO</div>
+            <div class="crono-display" id="cronoDisplay">00:00:00</div>
+            <div class="crono-preset">
+                <button class="cpbtn" onclick="setPreset(30)">30 min</button>
+                <button class="cpbtn" onclick="setPreset(45)">45 min</button>
+                <button class="cpbtn" onclick="setPreset(60)">60 min</button>
+                <button class="cpbtn" onclick="setPreset(75)">75 min</button>
+                <button class="cpbtn" onclick="setPreset(90)">90 min</button>
+            </div>
+            <div class="crono-input-row">
+                <input type="number" id="cronoH" min="0" max="9" value="0" placeholder="HH">
+                <span style="color:var(--muted);font-size:1.4em;">:</span>
+                <input type="number" id="cronoM" min="0" max="59" value="45" placeholder="MM">
+                <span style="color:var(--muted);font-size:1.4em;">:</span>
+                <input type="number" id="cronoS" min="0" max="59" value="0" placeholder="SS">
+            </div>
+            <div class="crono-btns">
+                <button onclick="cronoStart()" class="orange" id="btnStart">▶ Iniciar</button>
+                <button onclick="cronoPause()" class="sec" id="btnPause" style="display:none;">⏸ Pausar</button>
+                <button onclick="cronoReset()" class="sec">↺ Reiniciar</button>
+            </div>
         </div>
 
         <!-- DIARIO -->
@@ -1221,14 +1500,26 @@ app.get('/dashboard', async (req, res) => {
         s.cancel();
         const text = document.getElementById('rutina').innerText;
         if (!text.trim()) return;
-        const u = new SpeechSynthesisUtterance(text);
-        const sel = document.getElementById('voiceSelect');
-        const esp = voices.filter(v => v.lang.startsWith('es'));
-        u.voice = esp[parseInt(sel.value)] || selectedVoice;
-        u.lang = 'es-ES';
-        u.rate = 0.88;
-        u.pitch = modoVoz === 'm' ? 0.85 : 1.1;
-        s.speak(u);
+
+        // Dividir en frases para evitar cortes bruscos del navegador
+        const frases = text.match(/[^.!?]+[.!?]*/g) || [text];
+        let idx = 0;
+
+        function hablarFrase() {
+            if (idx >= frases.length) return;
+            const u = new SpeechSynthesisUtterance(frases[idx].trim());
+            const sel = document.getElementById('voiceSelect');
+            const esp = voices.filter(v => v.lang.startsWith('es'));
+            u.voice = esp[parseInt(sel.value)] || selectedVoice;
+            u.lang = 'es-ES';
+            u.rate = modoVoz === 'm' ? 0.92 : 0.95;
+            u.pitch = modoVoz === 'm' ? 0.9 : 1.05;
+            u.volume = 1;
+            u.onend = () => { idx++; hablarFrase(); };
+            u.onerror = () => { idx++; hablarFrase(); };
+            s.speak(u);
+        }
+        hablarFrase();
     }
 
     function detener() { window.speechSynthesis.cancel(); }
@@ -1238,8 +1529,8 @@ app.get('/dashboard', async (req, res) => {
     let currentMusic = null;
     const streams = {
         feng:    'https://streams.ilovemusic.de/iloveradio17.mp3',
-        clasica: 'https://streaming.radio.co/s3f4e57df4/listen',
-        rock:    'https://streams.ilovemusic.de/iloveradio2.mp3'
+        clasica: 'https://stream.srg-ssr.ch/rsc_de/mp3_128.m3u8',
+        rock:    'https://streams.ilovemusic.de/iloveradio1.mp3'
     };
 
     function playMusic(style) {
@@ -1264,6 +1555,132 @@ app.get('/dashboard', async (req, res) => {
         document.getElementById('volVal').textContent = v + '%';
         if (audio) audio.volume = v / 100;
     }
+
+    // ── MENSAJES ──────────────────────────────────────────────
+    function abrirMensajes() {
+        document.getElementById('modal-msg').classList.add('open');
+        // Marcar como leídos
+        fetch('/marcar-leidos', { method: 'POST' });
+        document.querySelectorAll('.msg-badge').forEach(b => b.remove());
+    }
+
+    // ── CRONÓMETRO ────────────────────────────────────────────
+    let cronoInterval = null;
+    let cronoTotal = 0;
+    let cronoRestante = 0;
+    let cronoPausado = false;
+    let alerta15Dada = false;
+    let alertaFinalDada = false;
+
+    const tiempoSugerido = {
+        'Perder PESO': 45,
+        'Ganar MÚSCULO': 60,
+        'Mejorar RESISTENCIA': 75,
+        'Tonificar el CUERPO': 50,
+        'Mantenerse en FORMA': 45
+    };
+    const sugerido = tiempoSugerido['${user.objetivo}'] || 45;
+    document.getElementById('cronoM').value = sugerido;
+
+    function setPreset(mins) {
+        document.querySelectorAll('.cpbtn').forEach(b => b.classList.remove('on'));
+        event.target.classList.add('on');
+        document.getElementById('cronoH').value = 0;
+        document.getElementById('cronoM').value = mins;
+        document.getElementById('cronoS').value = 0;
+        if (cronoInterval) cronoReset();
+    }
+
+    function pad(n) { return String(n).padStart(2, '0'); }
+
+    function actualizarDisplay(seg) {
+        const h = Math.floor(seg / 3600);
+        const m = Math.floor((seg % 3600) / 60);
+        const s = seg % 60;
+        const d = document.getElementById('cronoDisplay');
+        d.textContent = pad(h) + ':' + pad(m) + ':' + pad(s);
+        d.className = 'crono-display';
+        if (seg <= 900 && seg > 60) d.classList.add('warning');
+        if (seg <= 60) d.classList.add('danger');
+    }
+
+    function hablarAviso(texto) {
+        if (!window.speechSynthesis) return;
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(texto);
+        u.lang = 'es-ES';
+        u.rate = 0.9;
+        const esp = voices.filter(v => v.lang.startsWith('es'));
+        const sel = document.getElementById('voiceSelect');
+        if (sel && esp.length) u.voice = esp[parseInt(sel.value)] || esp[0];
+        window.speechSynthesis.speak(u);
+    }
+
+    function cronoStart() {
+        if (cronoInterval) return;
+        if (!cronoPausado) {
+            const h = parseInt(document.getElementById('cronoH').value) || 0;
+            const m = parseInt(document.getElementById('cronoM').value) || 0;
+            const s = parseInt(document.getElementById('cronoS').value) || 0;
+            cronoTotal = h * 3600 + m * 60 + s;
+            cronoRestante = cronoTotal;
+            alerta15Dada = false;
+            alertaFinalDada = false;
+            if (cronoTotal <= 0) return;
+        }
+        cronoPausado = false;
+        document.getElementById('btnStart').style.display = 'none';
+        document.getElementById('btnPause').style.display = 'inline-block';
+        cronoInterval = setInterval(() => {
+            cronoRestante--;
+            actualizarDisplay(cronoRestante);
+            // Alerta 15 min antes
+            if (!alerta15Dada && cronoRestante === 900) {
+                alerta15Dada = true;
+                hablarAviso('Atención, quedan 15 minutos para terminar tu entrenamiento. ¡Sigue adelante, lo estás haciendo genial!');
+            }
+            // Alerta final
+            if (!alertaFinalDada && cronoRestante === 0) {
+                alertaFinalDada = true;
+                clearInterval(cronoInterval);
+                cronoInterval = null;
+                document.getElementById('btnStart').style.display = 'inline-block';
+                document.getElementById('btnPause').style.display = 'none';
+                hablarAviso('¡Felicidades! Has completado tu sesión de entrenamiento. Excelente trabajo. No olvides hacer el enfriamiento y beber agua.');
+                document.getElementById('cronoDisplay').classList.add('danger');
+            }
+        }, 1000);
+    }
+
+    function cronoPause() {
+        if (cronoInterval) {
+            clearInterval(cronoInterval);
+            cronoInterval = null;
+            cronoPausado = true;
+            document.getElementById('btnStart').style.display = 'inline-block';
+            document.getElementById('btnStart').textContent = '▶ Continuar';
+            document.getElementById('btnPause').style.display = 'none';
+        }
+    }
+
+    function cronoReset() {
+        clearInterval(cronoInterval);
+        cronoInterval = null;
+        cronoPausado = false;
+        alerta15Dada = false;
+        alertaFinalDada = false;
+        const m = sugerido;
+        document.getElementById('cronoH').value = 0;
+        document.getElementById('cronoM').value = m;
+        document.getElementById('cronoS').value = 0;
+        actualizarDisplay(m * 60);
+        document.getElementById('btnStart').style.display = 'inline-block';
+        document.getElementById('btnStart').textContent = '▶ Iniciar';
+        document.getElementById('btnPause').style.display = 'none';
+        document.getElementById('cronoDisplay').className = 'crono-display';
+    }
+
+    actualizarDisplay(sugerido * 60);
 
     // ── GRÁFICA DE PESO ────────────────────────────────────────
     const histData = ${JSON.stringify(historial)};
@@ -1328,6 +1745,19 @@ app.get('/dashboard', async (req, res) => {
     </script>
     `));
 });
+
+// ─── GET+POST /regenerar-dieta ────────────────────────────────
+async function generarDieta(req, res) {
+    const user = await getUser(req);
+    if (!user) return res.redirect('/');
+    const dieta = await llamarGroq(buildPromptDieta(user));
+    if (dieta) {
+        await supabase.from('usuarios').update({ dieta_ia: dieta }).eq('id', user.id);
+    }
+    res.redirect('/dashboard');
+}
+app.get('/regenerar-dieta', generarDieta);
+app.post('/regenerar-dieta', generarDieta);
 
 // ─── POST /login ──────────────────────────────────────────────
 app.post('/login', async (req, res) => {
@@ -1455,6 +1885,185 @@ app.post('/guardar-nota', async (req, res) => {
         }]);
     }
     res.redirect('/dashboard');
+});
+
+// ─── POST /enviar-mensaje ─────────────────────────────────────
+app.post('/enviar-mensaje', async (req, res) => {
+    const user = await getUser(req);
+    if (!user || !req.body.contenido?.trim()) return res.redirect('/dashboard');
+    await supabase.from('mensajes').insert([{
+        usuario_id: user.id,
+        contenido: req.body.contenido.trim(),
+        es_del_admin: false,
+        leido: false
+    }]);
+    res.redirect('/dashboard');
+});
+
+// ─── POST /marcar-leidos ──────────────────────────────────────
+app.post('/marcar-leidos', async (req, res) => {
+    const user = await getUser(req);
+    if (!user) return res.sendStatus(401);
+    await supabase.from('mensajes')
+        .update({ leido: true })
+        .eq('usuario_id', user.id)
+        .eq('es_del_admin', true);
+    res.sendStatus(200);
+});
+
+// ─── GET /admin ───────────────────────────────────────────────
+app.get('/admin', async (req, res) => {
+    const user = await getUser(req);
+    if (!user || !user.es_admin) return res.redirect('/dashboard');
+
+    const { data: usuarios } = await supabase
+        .from('usuarios').select('id,nombre,edad,peso,objetivo,sexo,created_at')
+        .order('created_at', { ascending: false });
+
+    const { data: mensajes } = await supabase
+        .from('mensajes').select('*').order('fecha', { ascending: false });
+
+    const usersArr = usuarios || [];
+    const msgsArr = mensajes || [];
+    const sinResponder = msgsArr.filter(m => !m.es_del_admin && !msgsArr.some(r => r.es_del_admin && r.usuario_id === m.usuario_id && new Date(r.fecha) > new Date(m.fecha))).length;
+
+    res.send(page(`
+    <div class="topbar">
+        <div style="display:flex;align-items:center;gap:10px;">
+            <span style="font-family:'Rajdhani',sans-serif;font-size:1.1em;color:#ffcc00;letter-spacing:2px;">👑 PANEL ADMIN</span>
+        </div>
+        <div class="topbar-brand">EN-FORMA AI</div>
+        <div class="topbar-actions">
+            <a href="/dashboard" style="text-decoration:none;"><button class="tbtn">← Dashboard</button></a>
+            <form action="/logout" method="POST" style="display:inline;">
+                <button type="submit" class="tbtn red">CERRAR SESIÓN</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="admin-wrap">
+
+        <!-- STATS ADMIN -->
+        <div class="stats" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px;">
+            <div class="sc"><div class="sl">USUARIOS</div><div class="sv" style="color:var(--accent);">${usersArr.length}</div></div>
+            <div class="sc"><div class="sl">MENSAJES</div><div class="sv" style="color:var(--accent2);">${msgsArr.filter(m=>!m.es_del_admin).length}</div></div>
+            <div class="sc"><div class="sl">SIN RESPONDER</div><div class="sv" style="color:${sinResponder>0?'#ff4444':'#00ff88'};">${sinResponder}</div></div>
+        </div>
+
+        <!-- MENSAJE GLOBAL -->
+        <div class="card" style="border-left:3px solid #ffcc00;margin-bottom:16px;">
+            <div class="card-t" style="color:#ffcc00;">📢 MENSAJE GLOBAL A TODOS LOS USUARIOS</div>
+            <form action="/admin/mensaje-global" method="POST" onsubmit="showSpin('ENVIANDO A TODOS...')">
+                <textarea name="contenido" placeholder="Escribe el mensaje que recibirán TODOS los usuarios..." required style="min-height:70px;"></textarea>
+                <button type="submit" style="background:#ffcc00;color:#000;font-weight:700;">📨 Enviar a todos</button>
+            </form>
+        </div>
+
+        <!-- MENSAJES -->
+        <div class="card hl" style="margin-bottom:16px;">
+            <div class="card-t">💬 MENSAJES DE USUARIOS</div>
+            ${msgsArr.filter(m => !m.es_del_admin).length === 0
+                ? `<p style="color:var(--muted);font-size:.88em;">No hay mensajes aún.</p>`
+                : msgsArr.filter(m => !m.es_del_admin).map(m => {
+                    const uName = usersArr.find(u => u.id === m.usuario_id)?.nombre || 'Usuario';
+                    return `
+                    <div style="background:var(--card2);border-radius:10px;padding:12px;margin-bottom:10px;border-left:3px solid var(--accent2);">
+                        <div style="font-size:.75em;color:var(--muted);margin-bottom:6px;">
+                            👤 <b style="color:var(--accent);">${uName}</b> · ${new Date(m.fecha).toLocaleDateString('es-ES',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}
+                        </div>
+                        <div style="margin-bottom:10px;font-size:.9em;">${m.contenido}</div>
+                        <form action="/admin/responder" method="POST" style="display:flex;gap:8px;" onsubmit="showSpin('ENVIANDO RESPUESTA...')">
+                            <input type="hidden" name="usuario_id" value="${m.usuario_id}">
+                            <input name="respuesta" placeholder="Escribe tu respuesta..." required style="flex:1;margin-bottom:0;font-size:.85em;padding:8px 10px;">
+                            <button type="submit" class="abtn cyan" style="padding:8px 14px;white-space:nowrap;">📨 Responder</button>
+                        </form>
+                    </div>`;
+                }).join('')
+            }
+        </div>
+
+        <!-- USUARIOS -->
+        <div class="card">
+            <div class="card-t">👥 USUARIOS REGISTRADOS</div>
+            <div style="overflow-x:auto;">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Nombre</th><th>Edad</th><th>Peso</th><th>Objetivo</th><th>Sexo</th><th>Registro</th><th>Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${usersArr.map(u => `
+                        <tr>
+                            <td><b>${u.nombre}</b></td>
+                            <td>${u.edad} años</td>
+                            <td>${u.peso} kg</td>
+                            <td style="font-size:.82em;">${u.objetivo}</td>
+                            <td>${u.sexo}</td>
+                            <td style="font-size:.78em;color:var(--muted);">${u.created_at ? new Date(u.created_at).toLocaleDateString('es-ES') : '—'}</td>
+                            <td>
+                                <form action="/admin/eliminar-usuario" method="POST" onsubmit="return confirm('¿Eliminar a ${u.nombre}? Se borrarán todos sus datos.')">
+                                    <input type="hidden" name="usuario_id" value="${u.id}">
+                                    <button type="submit" class="abtn red">🗑 Eliminar</button>
+                                </form>
+                            </td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+    <div class="spin-overlay" id="spinner"><div class="spin"></div><div class="spin-t" id="spinMsg">PROCESANDO...</div></div>
+    <script>function showSpin(m){document.getElementById('spinMsg').textContent=m;document.getElementById('spinner').classList.add('show');}</script>
+    `));
+});
+
+// ─── POST /admin/mensaje-global ───────────────────────────────
+app.post('/admin/mensaje-global', async (req, res) => {
+    const user = await getUser(req);
+    if (!user || !user.es_admin) return res.redirect('/dashboard');
+    const { contenido } = req.body;
+    if (!contenido?.trim()) return res.redirect('/admin');
+    // Obtener todos los usuarios excepto el admin
+    const { data: usuarios } = await supabase.from('usuarios').select('id').eq('es_admin', false);
+    if (usuarios && usuarios.length > 0) {
+        const inserts = usuarios.map(u => ({
+            usuario_id: u.id,
+            contenido: contenido.trim(),
+            es_del_admin: true,
+            leido: false
+        }));
+        await supabase.from('mensajes').insert(inserts);
+    }
+    res.redirect('/admin');
+});
+
+// ─── POST /admin/responder ────────────────────────────────────
+app.post('/admin/responder', async (req, res) => {
+    const user = await getUser(req);
+    if (!user || !user.es_admin) return res.redirect('/dashboard');
+    const { usuario_id, respuesta } = req.body;
+    if (!respuesta?.trim()) return res.redirect('/admin');
+    await supabase.from('mensajes').insert([{
+        usuario_id: parseInt(usuario_id),
+        contenido: respuesta.trim(),
+        es_del_admin: true,
+        leido: false
+    }]);
+    res.redirect('/admin');
+});
+
+// ─── POST /admin/eliminar-usuario ─────────────────────────────
+app.post('/admin/eliminar-usuario', async (req, res) => {
+    const user = await getUser(req);
+    if (!user || !user.es_admin) return res.redirect('/dashboard');
+    const uid = parseInt(req.body.usuario_id);
+    // Borrar notas, mensajes y usuario
+    await supabase.from('notas').delete().eq('usuario_id', uid);
+    await supabase.from('mensajes').delete().eq('usuario_id', uid);
+    await supabase.from('usuarios').delete().eq('id', uid);
+    res.redirect('/admin');
 });
 
 // ─── POST /logout ─────────────────────────────────────────────
