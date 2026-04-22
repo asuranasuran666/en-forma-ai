@@ -678,6 +678,90 @@ button.orange:hover { box-shadow: 0 4px 15px rgba(255,102,0,0.3); }
 }
 .spin-sub { color: var(--muted); font-size: .8em; letter-spacing: 1px; }
 
+/* ── AVATAR ENTRENADOR ── */
+.trainer-wrap {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: var(--card2);
+    border: 1px solid rgba(0,212,255,0.12);
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 14px;
+}
+.trainer-avatar {
+    flex-shrink: 0;
+    width: 100px;
+    height: 100px;
+    position: relative;
+}
+.trainer-avatar svg { width: 100%; height: 100%; }
+.trainer-info { flex: 1; min-width: 0; }
+.trainer-name {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 1.1em;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 2px;
+    margin-bottom: 4px;
+}
+.trainer-status {
+    font-size: .78em;
+    color: var(--muted);
+    margin-bottom: 10px;
+    min-height: 1.2em;
+}
+.trainer-day-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.day-btn {
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: .72em;
+    font-weight: 700;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: var(--muted);
+    cursor: pointer;
+    transition: .2s;
+    width: auto;
+    letter-spacing: .5px;
+}
+.day-btn:hover { border-color: var(--accent); color: var(--accent); transform: none; box-shadow: none; }
+.day-btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
+.day-btn.today { border-color: var(--accent2); color: var(--accent2); }
+.day-btn.today.active { background: var(--accent2); color: #fff; }
+
+.trainer-speak-btn {
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: .8em;
+    font-weight: 700;
+    background: var(--accent);
+    color: #000;
+    border: none;
+    cursor: pointer;
+    transition: .2s;
+    width: auto;
+    letter-spacing: .5px;
+}
+.trainer-speak-btn:hover { opacity: .85; transform: none; box-shadow: none; }
+.trainer-speak-btn.speaking { background: var(--accent2); color: #fff; animation: speakPulse 1s infinite; }
+@keyframes speakPulse { 0%,100%{opacity:1} 50%{opacity:.7} }
+
+/* Avatar animations */
+@keyframes blink { 0%,90%,100%{transform:scaleY(1)} 95%{transform:scaleY(0.1)} }
+@keyframes eyebrowTalk { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-2px)} }
+@keyframes headBob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-2px)} }
+.avatar-head { transform-origin: center bottom; }
+.avatar-head.talking { animation: headBob .4s ease-in-out infinite; }
+.eye-left, .eye-right { transform-origin: center; animation: blink 4s infinite; }
+.eyebrow-l, .eyebrow-r { transform-origin: center; }
+.eyebrow-l.talking, .eyebrow-r.talking { animation: eyebrowTalk .3s ease-in-out infinite; }
+
 /* ── CRONÓMETRO ── */
 .crono-wrap {
     background: var(--card2);
@@ -1068,6 +1152,122 @@ app.get('/dashboard', async (req, res) => {
         ? user.consejo_ia
         : `<p style="color:var(--muted);">No se pudo generar la rutina. Usa el botón de abajo para generarla ahora.</p>`;
 
+    // Parsear días de la rutina
+    function parsearDias(html) {
+        if (!html) return [];
+        // Buscar patrones de días (Lunes, Día 1, Day 1, etc.)
+        const partes = html.split(/<h3[^>]*>/i);
+        const dias = [];
+        partes.forEach((p, i) => {
+            if (i === 0) return; // intro
+            const endH3 = p.indexOf('</h3>');
+            const titulo = endH3 > -1 ? p.substring(0, endH3).replace(/<[^>]+>/g, '') : 'Día ' + i;
+            const contenido = endH3 > -1 ? p.substring(endH3 + 5) : p;
+            dias.push({ titulo: titulo.trim(), contenido: `<h3>${titulo}</h3>${contenido}` });
+        });
+        return dias.length > 0 ? dias : [{ titulo: 'Tu Rutina', contenido: html }];
+    }
+
+    const diasRutina = parsearDias(user.consejo_ia);
+    const diasSemana = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+    const diaHoy = new Date().getDay(); // 0=Dom...6=Sab
+    const diaActivo = Math.min(diaHoy === 0 ? 6 : diaHoy - 1, diasRutina.length - 1);
+
+    const esFemenino = user.sexo === 'Femenino';
+    const trainerName = esFemenino ? 'Entrenadora Sofia' : 'Entrenador Marco';
+
+    const avatarMasc = `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="skinM" cx="50%" cy="40%" r="55%">
+          <stop offset="0%" stop-color="#d4956a"/>
+          <stop offset="100%" stop-color="#b8733a"/>
+        </radialGradient>
+        <radialGradient id="bgM" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#1a2a3a"/>
+          <stop offset="100%" stop-color="#0d1520"/>
+        </radialGradient>
+      </defs>
+      <!-- Background circle -->
+      <circle cx="50" cy="50" r="48" fill="url(#bgM)" stroke="rgba(0,212,255,0.3)" stroke-width="1.5"/>
+      <!-- Neck -->
+      <rect x="41" y="72" width="18" height="14" rx="4" fill="url(#skinM)"/>
+      <!-- Shoulders -->
+      <ellipse cx="50" cy="90" rx="28" ry="10" fill="#1a3a5a"/>
+      <!-- Head group -->
+      <g class="avatar-head" id="avatarHead">
+        <!-- Head -->
+        <ellipse cx="50" cy="46" rx="24" ry="27" fill="url(#skinM)"/>
+        <!-- Hair -->
+        <ellipse cx="50" cy="22" rx="24" ry="10" fill="#2a1a0a"/>
+        <rect x="26" y="20" width="48" height="8" fill="#2a1a0a" rx="2"/>
+        <ellipse cx="26" cy="35" rx="5" ry="12" fill="#2a1a0a"/>
+        <ellipse cx="74" cy="35" rx="5" ry="12" fill="#2a1a0a"/>
+        <!-- Eyebrows -->
+        <path class="eyebrow-l" d="M33 35 Q38 31 43 34" stroke="#2a1a0a" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+        <path class="eyebrow-r" d="M57 34 Q62 31 67 35" stroke="#2a1a0a" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+        <!-- Eyes -->
+        <g class="eye-left"><ellipse cx="38" cy="41" rx="5" ry="5.5" fill="white"/><circle cx="39" cy="41" r="3" fill="#1a3a6a"/><circle cx="39" cy="41" r="1.5" fill="#000"/><circle cx="40.5" cy="39.5" r="1" fill="white"/></g>
+        <g class="eye-right"><ellipse cx="62" cy="41" rx="5" ry="5.5" fill="white"/><circle cx="63" cy="41" r="3" fill="#1a3a6a"/><circle cx="63" cy="41" r="1.5" fill="#000"/><circle cx="64.5" cy="39.5" r="1" fill="white"/></g>
+        <!-- Nose -->
+        <path d="M50 44 Q47 52 44 54 Q50 56 56 54 Q53 52 50 44" fill="#c07845" opacity=".6"/>
+        <!-- Mouth -->
+        <path id="mouthM" d="M40 62 Q50 68 60 62" stroke="#8a4020" stroke-width="2" fill="none" stroke-linecap="round"/>
+        <!-- Jaw highlight -->
+        <ellipse cx="50" cy="68" rx="16" ry="5" fill="#c07845" opacity=".2"/>
+        <!-- Stubble hint -->
+        <ellipse cx="50" cy="64" rx="14" ry="6" fill="#9a6030" opacity=".15"/>
+      </g>
+    </svg>`;
+
+    const avatarFem = `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="skinF" cx="50%" cy="40%" r="55%">
+          <stop offset="0%" stop-color="#e8b090"/>
+          <stop offset="100%" stop-color="#d4856a"/>
+        </radialGradient>
+        <radialGradient id="bgF" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#2a1a3a"/>
+          <stop offset="100%" stop-color="#150d20"/>
+        </radialGradient>
+      </defs>
+      <circle cx="50" cy="50" r="48" fill="url(#bgF)" stroke="rgba(255,102,0,0.3)" stroke-width="1.5"/>
+      <rect x="41" y="72" width="18" height="14" rx="4" fill="url(#skinF)"/>
+      <ellipse cx="50" cy="90" rx="28" ry="10" fill="#3a1a4a"/>
+      <g class="avatar-head" id="avatarHead">
+        <ellipse cx="50" cy="46" rx="23" ry="26" fill="url(#skinF)"/>
+        <!-- Long hair back -->
+        <ellipse cx="50" cy="20" rx="25" ry="12" fill="#3a1505"/>
+        <path d="M25 28 Q20 55 24 80" stroke="#3a1505" stroke-width="10" fill="none" stroke-linecap="round"/>
+        <path d="M75 28 Q80 55 76 80" stroke="#3a1505" stroke-width="10" fill="none" stroke-linecap="round"/>
+        <rect x="25" y="18" width="50" height="10" fill="#3a1505" rx="2"/>
+        <!-- Eyebrows (thin) -->
+        <path class="eyebrow-l" d="M34 34 Q39 30 44 33" stroke="#3a1505" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+        <path class="eyebrow-r" d="M56 33 Q61 30 66 34" stroke="#3a1505" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+        <!-- Eyes with lashes -->
+        <g class="eye-left"><ellipse cx="38" cy="40" rx="5.5" ry="5" fill="white"/><circle cx="39" cy="40" r="3" fill="#2d1a4a"/><circle cx="39" cy="40" r="1.5" fill="#000"/><circle cx="40.5" cy="38.5" r="1" fill="white"/>
+        <path d="M32.5 37 L33.5 35 M35 36 L35.5 34 M38 35.5 L38 33.5 M41 36 L41.5 34 M43.5 37 L44.5 35.5" stroke="#1a0a2a" stroke-width="1.2" stroke-linecap="round"/></g>
+        <g class="eye-right"><ellipse cx="62" cy="40" rx="5.5" ry="5" fill="white"/><circle cx="63" cy="40" r="3" fill="#2d1a4a"/><circle cx="63" cy="40" r="1.5" fill="#000"/><circle cx="64.5" cy="38.5" r="1" fill="white"/>
+        <path d="M56.5 37 L57.5 35.5 M59 36 L59.5 34 M62 35.5 L62 33.5 M65 36 L65.5 34 M67.5 37 L68.5 35.5" stroke="#1a0a2a" stroke-width="1.2" stroke-linecap="round"/></g>
+        <!-- Nose (delicate) -->
+        <path d="M50 43 Q48 50 46 52 Q50 54 54 52 Q52 50 50 43" fill="#c07060" opacity=".4"/>
+        <!-- Lips -->
+        <path d="M42 61 Q46 58 50 59 Q54 58 58 61" fill="#d4506a" stroke="none"/>
+        <path id="mouthF" d="M42 61 Q50 67 58 61" stroke="#b03050" stroke-width="1.5" fill="#d4506a" opacity=".8"/>
+        <!-- Cheek blush -->
+        <ellipse cx="30" cy="50" rx="7" ry="5" fill="#ff8080" opacity=".15"/>
+        <ellipse cx="70" cy="50" rx="7" ry="5" fill="#ff8080" opacity=".15"/>
+      </g>
+    </svg>`;
+
+    const avatarSVG = esFemenino ? avatarFem : avatarMasc;
+
+    // Botones de días
+    const diasBtns = diasRutina.map((d, i) => {
+        const isToday = i === diaActivo;
+        return `<button class="day-btn${isToday ? ' active today' : ''}" onclick="selectDay(${i})" id="daybtn-${i}">${d.titulo.substring(0,8)}</button>`;
+    }).join('');
+
+
     res.send(page(`
     <!-- OVERLAY -->
     <div class="overlay" id="overlay" onclick="closeSidebar()"></div>
@@ -1270,15 +1470,29 @@ app.get('/dashboard', async (req, res) => {
             </div>
         </div>
 
-        <!-- RUTINA IA -->
-        <div class="card hl">
-            <div class="card-t">
-                🤖 TU PLAN PERSONALIZADO
-                <form action="/regenerar" method="POST" style="display:inline;" onsubmit="showSpin('GENERANDO NUEVA RUTINA CON IA...')">
-                    <button type="submit" class="orange" style="width:auto;padding:7px 14px;font-size:.75em;letter-spacing:.5px;">🔄 Regenerar</button>
-                </form>
+        <!-- ENTRENADOR + RUTINA -->
+        <div class="trainer-wrap">
+            <div class="trainer-avatar" id="trainerAvatar">${avatarSVG}</div>
+            <div class="trainer-info">
+                <div class="trainer-name">${trainerName}</div>
+                <div class="trainer-status" id="trainerStatus">Selecciona un día para empezar</div>
+                <div class="trainer-day-nav">
+                    ${diasBtns}
+                </div>
             </div>
-            <div id="rutina" class="rutina">${rutinaContent}</div>
+        </div>
+
+        <div class="card hl">
+            <div class="card-t" style="flex-wrap:wrap;gap:8px;">
+                <span>🤖 <span id="rutinaTitle">TU PLAN — ${diasRutina[diaActivo]?.titulo || 'HOY'}</span></span>
+                <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                    <button class="trainer-speak-btn" id="btnHablar" onclick="toggleHablar()">🔊 Escuchar este día</button>
+                    <form action="/regenerar" method="POST" style="display:inline;" onsubmit="showSpin('GENERANDO NUEVA RUTINA CON IA...')">
+                        <button type="submit" class="orange" style="width:auto;padding:7px 14px;font-size:.75em;">🔄 Regenerar</button>
+                    </form>
+                </div>
+            </div>
+            <div id="rutina" class="rutina">${diasRutina[diaActivo]?.contenido || rutinaContent}</div>
         </div>
 
         <!-- DIETA + RECOMENDACIONES -->
@@ -1443,12 +1657,123 @@ app.get('/dashboard', async (req, res) => {
         document.getElementById('spinner').classList.add('show');
     }
 
-    // ── TTS ───────────────────────────────────────────────────
+    // ── AVATAR + TTS ──────────────────────────────────────────
+    const diasData = ${JSON.stringify(diasRutina)};
+    let diaActivo = ${diaActivo};
+    let hablando = false;
+    let mouth = null;
+
+    function selectDay(idx) {
+        diaActivo = idx;
+        document.querySelectorAll('.day-btn').forEach((b,i) => {
+            b.classList.toggle('active', i === idx);
+        });
+        const dia = diasData[idx];
+        if (!dia) return;
+        document.getElementById('rutina').innerHTML = dia.contenido;
+        document.getElementById('rutinaTitle').textContent = 'TU PLAN — ' + dia.titulo.toUpperCase();
+        document.getElementById('trainerStatus').textContent = '📋 ' + dia.titulo;
+        if (hablando) { detener(); }
+    }
+
+    function toggleHablar() {
+        if (hablando) { detener(); return; }
+        leer();
+    }
+
+    function setTrainerTalking(talking) {
+        hablando = talking;
+        const btn = document.getElementById('btnHablar');
+        const head = document.querySelector('.avatar-head');
+        const brows = document.querySelectorAll('.eyebrow-l, .eyebrow-r');
+        if (btn) {
+            btn.textContent = talking ? '⏹ Detener' : '🔊 Escuchar este día';
+            btn.classList.toggle('speaking', talking);
+        }
+        if (head) head.classList.toggle('talking', talking);
+        brows.forEach(b => b.classList.toggle('talking', talking));
+        if (!talking) {
+            animateMouth(false);
+            document.getElementById('trainerStatus').textContent = '✅ Listo para el siguiente día';
+        }
+    }
+
+    // Mouth animation loop
+    let mouthInterval = null;
+    const mouthPaths = {
+        masc: document.getElementById('mouthM'),
+        fem:  document.getElementById('mouthF')
+    };
+
+    function animateMouth(active) {
+        const el = document.getElementById('mouthM') || document.getElementById('mouthF');
+        if (!el) return;
+        if (!active) {
+            clearInterval(mouthInterval);
+            mouthInterval = null;
+            const isFem = !!document.getElementById('mouthF');
+            el.setAttribute('d', isFem
+                ? 'M42 61 Q50 67 58 61'
+                : 'M40 62 Q50 68 60 62');
+            return;
+        }
+        const isFem = !!document.getElementById('mouthF');
+        const shapes = isFem
+            ? ['M42 61 Q50 67 58 61','M42 61 Q50 64 58 61','M42 62 Q50 69 58 62','M43 61 Q50 65 57 61','M42 61 Q50 66 58 61']
+            : ['M40 62 Q50 68 60 62','M40 62 Q50 65 60 62','M40 63 Q50 70 60 63','M41 62 Q50 66 59 62','M40 62 Q50 67 60 62'];
+        let si = 0;
+        mouthInterval = setInterval(() => {
+            el.setAttribute('d', shapes[si % shapes.length]);
+            si++;
+        }, 120);
+    }
+
+    function leer() {
+        const s = window.speechSynthesis;
+        s.cancel();
+        const text = document.getElementById('rutina').innerText;
+        if (!text.trim()) return;
+        setTrainerTalking(true);
+        animateMouth(true);
+        document.getElementById('trainerStatus').textContent = '🎙️ Narrando...';
+
+        const frases = text.match(/[^.!?]+[.!?]*/g) || [text];
+        let idx = 0;
+
+        function hablarFrase() {
+            if (idx >= frases.length) {
+                setTrainerTalking(false);
+                animateMouth(false);
+                return;
+            }
+            const u = new SpeechSynthesisUtterance(frases[idx].trim());
+            const sel = document.getElementById('voiceSelect');
+            const esp = voices.filter(v => v.lang.startsWith('es'));
+            u.voice = esp[parseInt(sel?.value)] || selectedVoice;
+            u.lang = 'es-ES';
+            u.rate = modoVoz === 'm' ? 0.92 : 0.95;
+            u.pitch = modoVoz === 'm' ? 0.9 : 1.05;
+            u.volume = 1;
+            u.onstart = () => animateMouth(true);
+            u.onend = () => { idx++; hablarFrase(); };
+            u.onerror = () => { idx++; hablarFrase(); };
+            s.speak(u);
+        }
+        hablarFrase();
+    }
+
+    function detener() {
+        window.speechSynthesis.cancel();
+        clearInterval(mouthInterval);
+        mouthInterval = null;
+        setTrainerTalking(false);
+        animateMouth(false);
+    }
     let voices = [];
     let selectedVoice = null;
     let vocesMasculinas = [];
     let vocesFemeninas = [];
-    let modoVoz = 'm';
+    let modoVoz = '${esFemenino ? 'f' : 'm'}';
 
     function loadVoices() {
         voices = window.speechSynthesis.getVoices();
@@ -1494,35 +1819,6 @@ app.get('/dashboard', async (req, res) => {
             selectedVoice = esp2[parseInt(sel.value)] || null;
         }
     }
-
-    function leer() {
-        const s = window.speechSynthesis;
-        s.cancel();
-        const text = document.getElementById('rutina').innerText;
-        if (!text.trim()) return;
-
-        // Dividir en frases para evitar cortes bruscos del navegador
-        const frases = text.match(/[^.!?]+[.!?]*/g) || [text];
-        let idx = 0;
-
-        function hablarFrase() {
-            if (idx >= frases.length) return;
-            const u = new SpeechSynthesisUtterance(frases[idx].trim());
-            const sel = document.getElementById('voiceSelect');
-            const esp = voices.filter(v => v.lang.startsWith('es'));
-            u.voice = esp[parseInt(sel.value)] || selectedVoice;
-            u.lang = 'es-ES';
-            u.rate = modoVoz === 'm' ? 0.92 : 0.95;
-            u.pitch = modoVoz === 'm' ? 0.9 : 1.05;
-            u.volume = 1;
-            u.onend = () => { idx++; hablarFrase(); };
-            u.onerror = () => { idx++; hablarFrase(); };
-            s.speak(u);
-        }
-        hablarFrase();
-    }
-
-    function detener() { window.speechSynthesis.cancel(); }
 
     // ── MÚSICA ────────────────────────────────────────────────
     let audio = null;
