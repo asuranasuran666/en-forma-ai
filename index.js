@@ -132,8 +132,8 @@ const CSS = `
 
 :root {
     --bg: #090910;
-    --card: #111118;
-    --card2: #18182a;
+    --card: #111118ee;
+    --card2: #18182aee;
     --accent: #00d4ff;
     --accent2: #ff6600;
     --text: #dde0ee;
@@ -154,7 +154,12 @@ body {
     font-size: 16px;
     transition: font-size .25s;
     min-height: 100vh;
-    background-image: radial-gradient(ellipse at 80% 0%, rgba(0,212,255,0.04) 0%, transparent 60%);
+    background-image:
+        linear-gradient(to bottom, rgba(9,9,16,0.82) 0%, rgba(9,9,16,0.75) 50%, rgba(9,9,16,0.9) 100%),
+        url('https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=1400&q=80&auto=format&fit=crop');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
 }
 
 body.zoom-mode { font-size: 20px; }
@@ -1365,6 +1370,22 @@ app.get('/dashboard', async (req, res) => {
                 </div>
             </div>
 
+            <!-- DIETA -->
+            <div class="sb-section">
+                <div class="sb-section-h" onclick="toggleSb('sb-dieta')">
+                    🥗 DIETA Y RECOMENDACIONES <span>▼</span>
+                </div>
+                <div class="sb-section-b" id="sb-dieta">
+                    ${user.dieta_ia
+                        ? `<div style="font-size:.85em;line-height:1.6;max-height:400px;overflow-y:auto;">${user.dieta_ia}</div><div class="div"></div>`
+                        : `<p style="color:var(--muted);font-size:.82em;margin-bottom:10px;">Aún no tienes un plan de dieta. Genera uno con IA basado en tu perfil y objetivo.</p>`
+                    }
+                    <form action="/regenerar-dieta" method="POST" onsubmit="showSpin('GENERANDO PLAN DE DIETA CON IA...')">
+                        <button type="submit" class="orange" style="font-size:.82em;">🤖 ${user.dieta_ia ? 'Regenerar dieta' : 'Generar dieta con IA'}</button>
+                    </form>
+                </div>
+            </div>
+
             <!-- CERRAR SESIÓN -->
             <form action="/logout" method="POST" style="margin-top:8px;">
                 <button type="submit" class="red">🚪 Cerrar Sesión</button>
@@ -1381,6 +1402,9 @@ app.get('/dashboard', async (req, res) => {
         </div>
         <div class="topbar-brand">EN-FORMA AI</div>
         <div class="topbar-actions">
+            <button class="msg-btn" onclick="toggleCrono()" id="btnCronoTop" title="Cronómetro">
+                ⏱
+            </button>
             <button class="msg-btn" onclick="abrirMensajes()" title="Mensajes y soporte">
                 💬
                 ${noLeidos > 0 ? `<span class="msg-badge">${noLeidos}</span>` : ''}
@@ -1392,7 +1416,43 @@ app.get('/dashboard', async (req, res) => {
         </div>
     </div>
 
-    <!-- MODAL MENSAJES -->
+    <!-- MODAL CRONÓMETRO -->
+    <div class="mo" id="modal-crono" style="align-items:flex-start;justify-content:flex-end;padding:60px 16px 0;">
+        <div class="mb2" style="max-width:340px;width:100%;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+                <div class="mo-t" style="margin-bottom:0;">⏱ CRONÓMETRO</div>
+                <button class="sec" style="width:auto;padding:6px 12px;font-size:.8em;" onclick="document.getElementById('modal-crono').classList.remove('open')">✕</button>
+            </div>
+            <!-- Mini avatar -->
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;padding:10px;background:rgba(0,212,255,0.05);border-radius:12px;border:1px solid rgba(0,212,255,0.1);">
+                <div style="width:56px;height:56px;flex-shrink:0;">${avatarSVG}</div>
+                <div>
+                    <div style="font-family:'Rajdhani',sans-serif;font-size:.9em;color:var(--accent);font-weight:700;">${trainerName}</div>
+                    <div style="font-size:.72em;color:var(--muted);" id="cronoTrainerStatus">Listo para entrenar</div>
+                </div>
+            </div>
+            <div class="crono-display" id="cronoDisplay">00:00:00</div>
+            <div class="crono-preset" style="margin-top:10px;">
+                <button class="cpbtn" onclick="setPreset(30)">30m</button>
+                <button class="cpbtn" onclick="setPreset(45)">45m</button>
+                <button class="cpbtn" onclick="setPreset(60)">60m</button>
+                <button class="cpbtn" onclick="setPreset(75)">75m</button>
+                <button class="cpbtn" onclick="setPreset(90)">90m</button>
+            </div>
+            <div class="crono-input-row" style="margin-top:10px;">
+                <input type="number" id="cronoH" min="0" max="9" value="0" placeholder="HH">
+                <span style="color:var(--muted);font-size:1.4em;">:</span>
+                <input type="number" id="cronoM" min="0" max="59" value="${tiempoSugerido[user.objetivo] || 45}" placeholder="MM">
+                <span style="color:var(--muted);font-size:1.4em;">:</span>
+                <input type="number" id="cronoS" min="0" max="59" value="0" placeholder="SS">
+            </div>
+            <div class="crono-btns">
+                <button onclick="cronoStart()" class="orange" id="btnStart">▶ Iniciar</button>
+                <button onclick="cronoPause()" class="sec" id="btnPause" style="display:none;">⏸ Pausar</button>
+                <button onclick="cronoReset()" class="sec">↺</button>
+            </div>
+        </div>
+    </div>
     <div class="mo" id="modal-msg">
         <div class="mb2" style="max-width:500px;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
@@ -1476,65 +1536,30 @@ app.get('/dashboard', async (req, res) => {
             <div class="trainer-info">
                 <div class="trainer-name">${trainerName}</div>
                 <div class="trainer-status" id="trainerStatus">Selecciona un día para empezar</div>
-                <div class="trainer-day-nav">
-                    ${diasBtns}
-                </div>
+                <button class="trainer-speak-btn" id="btnHablar" onclick="toggleHablar()">🔊 Escuchar hoy</button>
             </div>
         </div>
 
         <div class="card hl">
             <div class="card-t" style="flex-wrap:wrap;gap:8px;">
-                <span>🤖 <span id="rutinaTitle">TU PLAN — ${diasRutina[diaActivo]?.titulo || 'HOY'}</span></span>
-                <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                    <button class="trainer-speak-btn" id="btnHablar" onclick="toggleHablar()">🔊 Escuchar este día</button>
-                    <form action="/regenerar" method="POST" style="display:inline;" onsubmit="showSpin('GENERANDO NUEVA RUTINA CON IA...')">
-                        <button type="submit" class="orange" style="width:auto;padding:7px 14px;font-size:.75em;">🔄 Regenerar</button>
-                    </form>
-                </div>
-            </div>
-            <div id="rutina" class="rutina">${diasRutina[diaActivo]?.contenido || rutinaContent}</div>
-        </div>
-
-        <!-- DIETA + RECOMENDACIONES -->
-        <div class="card" style="border-left:3px solid #00ff88;">
-            <div class="card-t" style="color:#00ff88;">
-                🥗 DIETA Y RECOMENDACIONES
-                <form action="/regenerar-dieta" method="POST" style="display:inline;" onsubmit="showSpin('GENERANDO PLAN DE DIETA CON IA...')">
-                    <button type="submit" class="orange" style="width:auto;padding:7px 14px;font-size:.75em;letter-spacing:.5px;">🔄 Generar</button>
+                <span>🤖 TU PLAN SEMANAL</span>
+                <form action="/regenerar" method="POST" style="display:inline;" onsubmit="showSpin('GENERANDO NUEVA RUTINA CON IA...')">
+                    <button type="submit" class="orange" style="width:auto;padding:7px 14px;font-size:.75em;">🔄 Regenerar</button>
                 </form>
             </div>
-            ${user.dieta_ia
-                ? `<div id="dieta">${user.dieta_ia}</div>`
-                : `<div style="color:var(--muted);font-size:.88em;padding:8px 0;">
-                    Pulsa <b style="color:#00ff88;">Generar</b> para que la IA cree un plan de dieta personalizado 
-                    basado en tu objetivo y perfil, con recomendaciones para tus lesiones si las tienes.
-                   </div>`
-            }
-        </div>
-
-        <!-- CRONÓMETRO -->
-        <div class="crono-wrap">
-            <div class="crono-label">⏱ CRONÓMETRO DE ENTRENAMIENTO</div>
-            <div class="crono-display" id="cronoDisplay">00:00:00</div>
-            <div class="crono-preset">
-                <button class="cpbtn" onclick="setPreset(30)">30 min</button>
-                <button class="cpbtn" onclick="setPreset(45)">45 min</button>
-                <button class="cpbtn" onclick="setPreset(60)">60 min</button>
-                <button class="cpbtn" onclick="setPreset(75)">75 min</button>
-                <button class="cpbtn" onclick="setPreset(90)">90 min</button>
-            </div>
-            <div class="crono-input-row">
-                <input type="number" id="cronoH" min="0" max="9" value="0" placeholder="HH">
-                <span style="color:var(--muted);font-size:1.4em;">:</span>
-                <input type="number" id="cronoM" min="0" max="59" value="45" placeholder="MM">
-                <span style="color:var(--muted);font-size:1.4em;">:</span>
-                <input type="number" id="cronoS" min="0" max="59" value="0" placeholder="SS">
-            </div>
-            <div class="crono-btns">
-                <button onclick="cronoStart()" class="orange" id="btnStart">▶ Iniciar</button>
-                <button onclick="cronoPause()" class="sec" id="btnPause" style="display:none;">⏸ Pausar</button>
-                <button onclick="cronoReset()" class="sec">↺ Reiniciar</button>
-            </div>
+            ${diasRutina.map((d, i) => {
+                const isToday = i === diaActivo;
+                return `<div class="acc" style="margin-bottom:8px;${isToday ? 'border-color:rgba(0,212,255,0.3);' : ''}">
+                    <div class="acc-h" onclick="selectDay(${i}, this)" style="${isToday ? 'color:var(--accent);' : 'color:var(--muted);'}">
+                        ${isToday ? '📅' : '📋'} ${d.titulo} ${isToday ? '<span style="font-size:.7em;background:rgba(0,212,255,0.15);color:var(--accent);padding:2px 8px;border-radius:10px;margin-left:6px;">HOY</span>' : ''}
+                        <span class="arr">${isToday ? '▲' : '▼'}</span>
+                    </div>
+                    <div class="acc-b ${isToday ? 'open' : ''}" id="dia-${i}">
+                        <div class="rutina">${d.contenido}</div>
+                        <button onclick="selectDaySpeak(${i})" class="sec" style="margin-top:10px;padding:8px 14px;width:auto;font-size:.8em;">🔊 Escuchar este día</button>
+                    </div>
+                </div>`;
+            }).join('')}
         </div>
 
         <!-- DIARIO -->
@@ -1665,15 +1690,49 @@ app.get('/dashboard', async (req, res) => {
 
     function selectDay(idx) {
         diaActivo = idx;
-        document.querySelectorAll('.day-btn').forEach((b,i) => {
-            b.classList.toggle('active', i === idx);
-        });
+        const body = document.getElementById('dia-' + idx);
+        if (!body) return;
+        const isOpen = body.classList.contains('open');
+        document.querySelectorAll('[id^="dia-"]').forEach(b => b.classList.remove('open'));
+        document.querySelectorAll('.acc-h .arr').forEach(a => a.textContent = '▼');
+        if (!isOpen) {
+            body.classList.add('open');
+            const arr = body.previousElementSibling?.querySelector('.arr');
+            if (arr) arr.textContent = '▲';
+        }
+        const dia = diasData[idx];
+        if (dia) document.getElementById('trainerStatus').textContent = '📋 ' + dia.titulo;
+        if (hablando) detener();
+    }
+
+    function selectDaySpeak(idx) {
+        diaActivo = idx;
         const dia = diasData[idx];
         if (!dia) return;
-        document.getElementById('rutina').innerHTML = dia.contenido;
-        document.getElementById('rutinaTitle').textContent = 'TU PLAN — ' + dia.titulo.toUpperCase();
-        document.getElementById('trainerStatus').textContent = '📋 ' + dia.titulo;
-        if (hablando) { detener(); }
+        const tmp = document.createElement('div');
+        tmp.innerHTML = dia.contenido;
+        const text = tmp.innerText || tmp.textContent || '';
+        if (!text.trim()) return;
+        setTrainerTalking(true);
+        animateMouth(true);
+        document.getElementById('trainerStatus').textContent = '🎙️ Narrando ' + dia.titulo;
+        const frases = text.match(/[^.!?]+[.!?]*/g) || [text];
+        let fidx = 0;
+        window.speechSynthesis.cancel();
+        function hablar() {
+            if (fidx >= frases.length) { setTrainerTalking(false); animateMouth(false); return; }
+            const u = new SpeechSynthesisUtterance(frases[fidx].trim());
+            const sel = document.getElementById('voiceSelect');
+            const esp = voices.filter(v => v.lang.startsWith('es'));
+            u.voice = esp[parseInt(sel?.value)] || selectedVoice;
+            u.lang = 'es-ES';
+            u.rate = modoVoz === 'm' ? 0.92 : 0.95;
+            u.pitch = modoVoz === 'm' ? 0.9 : 1.05;
+            u.onend = () => { fidx++; hablar(); };
+            u.onerror = () => { fidx++; hablar(); };
+            window.speechSynthesis.speak(u);
+        }
+        hablar();
     }
 
     function toggleHablar() {
@@ -1855,9 +1914,13 @@ app.get('/dashboard', async (req, res) => {
     // ── MENSAJES ──────────────────────────────────────────────
     function abrirMensajes() {
         document.getElementById('modal-msg').classList.add('open');
-        // Marcar como leídos
         fetch('/marcar-leidos', { method: 'POST' });
         document.querySelectorAll('.msg-badge').forEach(b => b.remove());
+    }
+
+    function toggleCrono() {
+        const m = document.getElementById('modal-crono');
+        m.classList.toggle('open');
     }
 
     // ── CRONÓMETRO ────────────────────────────────────────────
@@ -1927,6 +1990,8 @@ app.get('/dashboard', async (req, res) => {
         cronoPausado = false;
         document.getElementById('btnStart').style.display = 'none';
         document.getElementById('btnPause').style.display = 'inline-block';
+        const cts = document.getElementById('cronoTrainerStatus');
+        if (cts) cts.textContent = '💪 Entrenando...';
         cronoInterval = setInterval(() => {
             cronoRestante--;
             actualizarDisplay(cronoRestante);
@@ -1944,6 +2009,8 @@ app.get('/dashboard', async (req, res) => {
                 document.getElementById('btnPause').style.display = 'none';
                 hablarAviso('¡Felicidades! Has completado tu sesión de entrenamiento. Excelente trabajo. No olvides hacer el enfriamiento y beber agua.');
                 document.getElementById('cronoDisplay').classList.add('danger');
+                const cts2 = document.getElementById('cronoTrainerStatus');
+                if (cts2) cts2.textContent = '🏆 ¡Sesión completada!';
             }
         }, 1000);
     }
@@ -2213,6 +2280,23 @@ app.get('/admin', async (req, res) => {
     const user = await getUser(req);
     if (!user || !user.es_admin) return res.redirect('/dashboard');
 
+    // PIN check
+    const ADMIN_PIN = process.env.ADMIN_PIN || '1234';
+    if (req.cookies['admin_pin'] !== ADMIN_PIN) {
+        return res.send(page(`
+        <div class="lp">
+            <div class="lc" style="max-width:320px;">
+                <div class="logo"><h1 style="font-size:1.8em;">👑 ADMIN</h1><p>INGRESA TU PIN DE ACCESO</p></div>
+                ${req.query.err ? '<div class="err">PIN incorrecto</div>' : ''}
+                <form action="/admin/pin" method="POST">
+                    <input name="pin" type="password" placeholder="PIN" maxlength="8" style="text-align:center;font-size:1.5em;letter-spacing:6px;" required autofocus>
+                    <button type="submit">ENTRAR</button>
+                </form>
+                <a href="/dashboard" style="display:block;text-align:center;color:var(--muted);font-size:.82em;margin-top:12px;text-decoration:none;">← Volver</a>
+            </div>
+        </div>`));
+    }
+
     const { data: usuarios, error: errU } = await supabase
         .from('usuarios').select('id,nombre,edad,peso,objetivo,sexo,padecimientos')
         .order('id', { ascending: false });
@@ -2300,10 +2384,22 @@ app.get('/admin', async (req, res) => {
                             <td>${u.peso} kg</td>
                             <td style="font-size:.82em;">${u.objetivo}</td>
                             <td>${u.sexo}</td>
-                            <td>
-                                <form action="/admin/eliminar-usuario" method="POST" onsubmit="return confirm('¿Eliminar a ${u.nombre}? Se borrarán todos sus datos.')">
+                            <td style="display:flex;gap:6px;flex-wrap:wrap;">
+                                <button class="abtn cyan" onclick="document.getElementById('msgModal-${u.id}').style.display='flex'">✉️ Mensaje</button>
+                                <form action="/admin/eliminar-usuario" method="POST" onsubmit="return confirm('¿Eliminar a ${u.nombre}?')">
                                     <input type="hidden" name="usuario_id" value="${u.id}">
                                     <button type="submit" class="abtn red">🗑 Eliminar</button>
+                                </form>
+                            </td>
+                        </tr>
+                        <!-- Mini modal mensaje usuario -->
+                        <tr id="msgModal-${u.id}" style="display:none;">
+                            <td colspan="6" style="padding:10px;background:rgba(0,212,255,0.05);">
+                                <form action="/admin/mensaje-usuario" method="POST" style="display:flex;gap:8px;align-items:center;">
+                                    <input type="hidden" name="usuario_id" value="${u.id}">
+                                    <input name="contenido" placeholder="Mensaje para ${u.nombre}..." required style="flex:1;margin-bottom:0;font-size:.85em;padding:8px 10px;">
+                                    <button type="submit" class="abtn cyan" style="padding:8px 14px;">📨 Enviar</button>
+                                    <button type="button" class="abtn red" onclick="document.getElementById('msgModal-${u.id}').style.display='none'">✕</button>
                                 </form>
                             </td>
                         </tr>`).join('')}
@@ -2316,6 +2412,31 @@ app.get('/admin', async (req, res) => {
     <div class="spin-overlay" id="spinner"><div class="spin"></div><div class="spin-t" id="spinMsg">PROCESANDO...</div></div>
     <script>function showSpin(m){document.getElementById('spinMsg').textContent=m;document.getElementById('spinner').classList.add('show');}</script>
     `));
+});
+
+// ─── POST /admin/pin ──────────────────────────────────────────
+app.post('/admin/pin', async (req, res) => {
+    const ADMIN_PIN = process.env.ADMIN_PIN || '1234';
+    if (req.body.pin === ADMIN_PIN) {
+        res.setHeader('Set-Cookie', `admin_pin=${ADMIN_PIN}; Path=/; HttpOnly; Max-Age=28800`);
+        return res.redirect('/admin');
+    }
+    res.redirect('/admin?err=1');
+});
+
+// ─── POST /admin/mensaje-usuario ──────────────────────────────
+app.post('/admin/mensaje-usuario', async (req, res) => {
+    const user = await getUser(req);
+    if (!user || !user.es_admin) return res.redirect('/dashboard');
+    const { usuario_id, contenido } = req.body;
+    if (!contenido?.trim()) return res.redirect('/admin');
+    await supabase.from('mensajes').insert([{
+        usuario_id: parseInt(usuario_id),
+        contenido: contenido.trim(),
+        es_del_admin: true,
+        leido: false
+    }]);
+    res.redirect('/admin');
 });
 
 // ─── POST /admin/mensaje-global ───────────────────────────────
