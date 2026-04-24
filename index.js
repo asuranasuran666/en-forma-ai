@@ -1442,7 +1442,8 @@ app.get('/dashboard', async (req, res) => {
             <div class="crono-input-row" style="margin-top:10px;">
                 <input type="number" id="cronoH" min="0" max="9" value="0" placeholder="HH">
                 <span style="color:var(--muted);font-size:1.4em;">:</span>
-                <input type="number" id="cronoM" min="0" max="59" value="${tiempoSugerido[user.objetivo] || 45}" placeholder="MM">
+                <input type="number" id="cronoM" min="0" max="59" value="45" placeholder="MM">
+    <span>:</span>
                 <span style="color:var(--muted);font-size:1.4em;">:</span>
                 <input type="number" id="cronoS" min="0" max="59" value="0" placeholder="SS">
             </div>
@@ -1938,7 +1939,7 @@ app.get('/dashboard', async (req, res) => {
         'Tonificar el CUERPO': 50,
         'Mantenerse en FORMA': 45
     };
-    const sugerido = tiempoSugerido['${user.objetivo}'] || 45;
+    const sugerido = tiempoSugerido[`${user.objetivo}`] || 45;
     document.getElementById('cronoM').value = sugerido;
 
     function setPreset(mins) {
@@ -2431,7 +2432,7 @@ app.post('/admin/mensaje-usuario', async (req, res) => {
     const { usuario_id, contenido } = req.body;
     if (!contenido?.trim()) return res.redirect('/admin');
     await supabase.from('mensajes').insert([{
-        usuario_id: parseInt(usuario_id),
+        usuario_id: usuario_id,
         contenido: contenido.trim(),
         es_del_admin: true,
         leido: false
@@ -2468,7 +2469,7 @@ app.post('/admin/responder', async (req, res) => {
     const { usuario_id, respuesta } = req.body;
     if (!respuesta?.trim()) return res.redirect('/admin');
     await supabase.from('mensajes').insert([{
-        usuario_id: parseInt(usuario_id),
+        usuario_id: usuario_id,
         contenido: respuesta.trim(),
         es_del_admin: true,
         leido: false
@@ -2480,7 +2481,7 @@ app.post('/admin/responder', async (req, res) => {
 app.post('/admin/eliminar-usuario', async (req, res) => {
     const user = await getUser(req);
     if (!user || !user.es_admin) return res.redirect('/dashboard');
-    const uid = parseInt(req.body.usuario_id);
+    const uid = req.body.usuario_id;
     // Borrar notas, mensajes y usuario
     await supabase.from('notas').delete().eq('usuario_id', uid);
     await supabase.from('mensajes').delete().eq('usuario_id', uid);
