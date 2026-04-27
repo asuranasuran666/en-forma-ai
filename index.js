@@ -1442,8 +1442,7 @@ app.get('/dashboard', async (req, res) => {
             <div class="crono-input-row" style="margin-top:10px;">
                 <input type="number" id="cronoH" min="0" max="9" value="0" placeholder="HH">
                 <span style="color:var(--muted);font-size:1.4em;">:</span>
-                <input type="number" id="cronoM" min="0" max="59" value="45" placeholder="MM">
-    <span>:</span>
+                <input type="number" id="cronoM" min="0" max="59" value="${{'Perder PESO':45,'Ganar MÚSCULO':60,'Mejorar RESISTENCIA':75,'Tonificar el CUERPO':50,'Mantenerse en FORMA':45}[user.objetivo] || 45}" placeholder="MM">
                 <span style="color:var(--muted);font-size:1.4em;">:</span>
                 <input type="number" id="cronoS" min="0" max="59" value="0" placeholder="SS">
             </div>
@@ -1939,7 +1938,7 @@ app.get('/dashboard', async (req, res) => {
         'Tonificar el CUERPO': 50,
         'Mantenerse en FORMA': 45
     };
-    const sugerido = tiempoSugerido[`${user.objetivo}`] || 45;
+    const sugerido = tiempoSugerido['${user.objetivo}'] || 45;
     document.getElementById('cronoM').value = sugerido;
 
     function setPreset(mins) {
