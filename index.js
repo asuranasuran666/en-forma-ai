@@ -683,127 +683,145 @@ button.orange:hover { box-shadow: 0 4px 15px rgba(255,102,0,0.3); }
 }
 .spin-sub { color: var(--muted); font-size: .8em; letter-spacing: 1px; }
 
-/* ── AVATAR ENTRENADOR ── */
-.trainer-wrap {
+/* ── LAYOUT CON PANEL FIJO ── */
+.main-layout {
     display: flex;
-    align-items: center;
-    gap: 16px;
-    background: var(--card2);
-    border: 1px solid rgba(0,212,255,0.12);
-    border-radius: 16px;
-    padding: 16px;
-    margin-bottom: 14px;
+    gap: 0;
+    align-items: flex-start;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 14px;
 }
-.trainer-avatar {
+.main-content { flex: 1; min-width: 0; padding: 20px 16px 40px 0; }
+.side-panel {
+    width: 240px;
     flex-shrink: 0;
-    width: 100px;
-    height: 100px;
-    position: relative;
+    position: sticky;
+    top: 56px;
+    height: calc(100vh - 56px);
+    overflow-y: auto;
+    padding: 16px 0 16px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    scrollbar-width: none;
 }
-.trainer-avatar svg { width: 100%; height: 100%; }
-.trainer-info { flex: 1; min-width: 0; }
+.side-panel::-webkit-scrollbar { display: none; }
+
+@media (max-width: 768px) {
+    .main-layout { flex-direction: column; padding: 0 10px; }
+    .main-content { padding: 16px 0 120px; }
+    .side-panel {
+        position: fixed;
+        bottom: 0; left: 0; right: 0;
+        width: 100%;
+        height: auto;
+        top: auto;
+        flex-direction: row;
+        background: rgba(9,9,16,0.97);
+        border-top: 1px solid rgba(0,212,255,0.15);
+        padding: 8px 12px;
+        z-index: 200;
+        backdrop-filter: blur(10px);
+        gap: 8px;
+        align-items: center;
+        overflow-x: auto;
+        overflow-y: hidden;
+    }
+}
+
+/* ── AVATAR PANEL ── */
+.avatar-panel {
+    background: rgba(17,17,24,0.9);
+    border: 1px solid rgba(0,212,255,0.15);
+    border-radius: 16px;
+    padding: 12px;
+    text-align: center;
+    backdrop-filter: blur(10px);
+}
+.avatar-panel svg { width: 100%; max-width: 210px; height: auto; display: block; margin: 0 auto; }
 .trainer-name {
     font-family: 'Rajdhani', sans-serif;
-    font-size: 1.1em;
+    font-size: .95em;
     font-weight: 700;
     color: var(--accent);
     letter-spacing: 2px;
-    margin-bottom: 4px;
+    margin-top: 6px;
 }
 .trainer-status {
-    font-size: .78em;
+    font-size: .7em;
     color: var(--muted);
-    margin-bottom: 10px;
-    min-height: 1.2em;
+    margin: 4px 0 8px;
+    min-height: 1em;
 }
-.trainer-day-nav {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-}
-.day-btn {
-    padding: 5px 10px;
-    border-radius: 6px;
-    font-size: .72em;
-    font-weight: 700;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08);
-    color: var(--muted);
-    cursor: pointer;
-    transition: .2s;
-    width: auto;
-    letter-spacing: .5px;
-}
-.day-btn:hover { border-color: var(--accent); color: var(--accent); transform: none; box-shadow: none; }
-.day-btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
-.day-btn.today { border-color: var(--accent2); color: var(--accent2); }
-.day-btn.today.active { background: var(--accent2); color: #fff; }
-
 .trainer-speak-btn {
-    padding: 8px 16px;
+    padding: 7px 12px;
     border-radius: 8px;
-    font-size: .8em;
+    font-size: .75em;
     font-weight: 700;
     background: var(--accent);
     color: #000;
     border: none;
     cursor: pointer;
+    width: 100%;
     transition: .2s;
-    width: auto;
-    letter-spacing: .5px;
 }
 .trainer-speak-btn:hover { opacity: .85; transform: none; box-shadow: none; }
 .trainer-speak-btn.speaking { background: var(--accent2); color: #fff; animation: speakPulse 1s infinite; }
 @keyframes speakPulse { 0%,100%{opacity:1} 50%{opacity:.7} }
 
-/* Avatar animations */
-@keyframes blink { 0%,90%,100%{transform:scaleY(1)} 95%{transform:scaleY(0.1)} }
-@keyframes eyebrowTalk { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-2px)} }
-@keyframes headBob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-2px)} }
-.avatar-head { transform-origin: center bottom; }
-.avatar-head.talking { animation: headBob .4s ease-in-out infinite; }
-.eye-left, .eye-right { transform-origin: center; animation: blink 4s infinite; }
-.eyebrow-l, .eyebrow-r { transform-origin: center; }
-.eyebrow-l.talking, .eyebrow-r.talking { animation: eyebrowTalk .3s ease-in-out infinite; }
-
-/* ── CRONÓMETRO ── */
-.crono-wrap {
-    background: var(--card2);
+/* ── CRONO PANEL ── */
+.crono-panel {
+    background: rgba(17,17,24,0.9);
     border: 1px solid rgba(0,212,255,0.15);
     border-radius: 16px;
-    padding: 20px;
+    padding: 12px;
     text-align: center;
-    margin-bottom: 14px;
+    backdrop-filter: blur(10px);
 }
+.crono-label { font-size:.65em; color:var(--muted); letter-spacing:2px; text-transform:uppercase; margin-bottom:6px; }
 .crono-display {
     font-family: 'Rajdhani', sans-serif;
-    font-size: 4.5em;
+    font-size: 2.8em;
     font-weight: 700;
     color: var(--accent);
-    letter-spacing: 4px;
-    text-shadow: 0 0 30px rgba(0,212,255,0.3);
+    letter-spacing: 3px;
+    text-shadow: 0 0 20px rgba(0,212,255,0.4);
     line-height: 1;
-    margin: 10px 0;
+    margin: 4px 0 8px;
 }
-.crono-display.warning { color: var(--yellow); text-shadow: 0 0 30px rgba(255,204,0,0.4); }
-.crono-display.danger  { color: #ff4444;       text-shadow: 0 0 30px rgba(255,68,68,0.4); animation: pulse .6s infinite; }
+.crono-display.warning { color: var(--yellow); text-shadow: 0 0 20px rgba(255,204,0,0.4); }
+.crono-display.danger  { color: #ff4444; text-shadow: 0 0 20px rgba(255,68,68,0.4); animation: pulse .6s infinite; }
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
 
-.crono-label { font-size:.75em; color:var(--muted); letter-spacing:2px; text-transform:uppercase; margin-bottom:14px; }
-.crono-preset { display:flex; gap:6px; justify-content:center; flex-wrap:wrap; margin-bottom:14px; }
+.crono-preset { display:flex; gap:4px; justify-content:center; flex-wrap:wrap; margin-bottom:8px; }
 .cpbtn {
-    padding:6px 12px; border-radius:20px; font-size:.75em; font-weight:700;
+    padding:4px 8px; border-radius:12px; font-size:.68em; font-weight:700;
     background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1);
     color:var(--muted); cursor:pointer; transition:.2s; width:auto;
 }
 .cpbtn:hover { border-color:var(--accent); color:var(--accent); transform:none; box-shadow:none; }
 .cpbtn.on { background:var(--accent); color:#000; border-color:var(--accent); }
+.crono-input-row { display:flex; gap:4px; justify-content:center; align-items:center; margin-bottom:8px; }
+.crono-input-row input { width:46px; text-align:center; font-family:'Rajdhani',sans-serif; font-size:1em; margin-bottom:0; padding:6px 4px; }
+.crono-input-row span { color:var(--muted); font-size:1.2em; }
+.crono-btns { display:flex; gap:6px; justify-content:center; }
+.crono-btns button { width:auto; padding:7px 10px; flex:1; font-size:.78em; }
 
-.crono-input-row { display:flex; gap:8px; justify-content:center; align-items:center; margin-bottom:14px; }
-.crono-input-row input { width:70px; text-align:center; font-family:'Rajdhani',sans-serif; font-size:1.2em; margin-bottom:0; }
-.crono-btns { display:flex; gap:8px; justify-content:center; }
-.crono-btns button { width:auto; padding:10px 22px; flex:1; max-width:120px; }
+/* Avatar animations */
+@keyframes blink { 0%,88%,100%{transform:scaleY(1)} 92%{transform:scaleY(0.08)} }
+@keyframes headBob { 0%,100%{transform:translateY(0) rotate(0deg)} 30%{transform:translateY(-1.5px) rotate(.5deg)} 70%{transform:translateY(1px) rotate(-.3deg)} }
+@keyframes armLTalk { 0%,100%{transform:rotate(0deg)} 50%{transform:rotate(-12deg)} }
+@keyframes armRTalk { 0%,100%{transform:rotate(0deg)} 50%{transform:rotate(12deg)} }
+@keyframes breathe { 0%,100%{transform:scaleY(1)} 50%{transform:scaleY(1.015)} }
+.avatar-body { transform-origin: center top; animation: breathe 3s ease-in-out infinite; }
+.avatar-head { transform-origin: 50% 100%; }
+.avatar-head.talking { animation: headBob .5s ease-in-out infinite; }
+.eye-l, .eye-r { transform-origin: center; animation: blink 5s infinite; }
+.arm-l { transform-origin: 72% 35%; }
+.arm-r { transform-origin: 28% 35%; }
+.arm-l.talking { animation: armLTalk .6s ease-in-out infinite; }
+.arm-r.talking { animation: armRTalk .6s ease-in-out infinite alternate; }
 
 /* ── MENSAJES BADGE ── */
 .msg-btn {
@@ -843,6 +861,7 @@ button.orange:hover { box-shadow: 0 4px 15px rgba(255,102,0,0.3); }
 .msg-item.del-admin .msg-meta::before { content:'👨‍💼 Soporte · '; }
 .msg-item.del-user .msg-meta::before  { content:'Tú · '; }
 .msg-empty { color:var(--muted); font-size:.85em; text-align:center; padding:20px 0; }
+
 
 /* ── ADMIN PANEL ── */
 .admin-wrap { max-width:900px; margin:0 auto; padding:20px 14px 40px; }
@@ -1181,86 +1200,181 @@ app.get('/dashboard', async (req, res) => {
     const esFemenino = user.sexo === 'Femenino';
     const trainerName = esFemenino ? 'Entrenadora Sofia' : 'Entrenador Marco';
 
-    const avatarMasc = `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    const avatarMasc = `<svg viewBox="0 0 160 220" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <radialGradient id="skinM" cx="50%" cy="40%" r="55%">
-          <stop offset="0%" stop-color="#d4956a"/>
-          <stop offset="100%" stop-color="#b8733a"/>
+        <radialGradient id="skinM" cx="50%" cy="35%" r="60%">
+          <stop offset="0%" stop-color="#f0c090"/>
+          <stop offset="100%" stop-color="#d4956a"/>
         </radialGradient>
-        <radialGradient id="bgM" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stop-color="#1a2a3a"/>
-          <stop offset="100%" stop-color="#0d1520"/>
+        <radialGradient id="shirtM" cx="50%" cy="30%" r="70%">
+          <stop offset="0%" stop-color="#1a4a7a"/>
+          <stop offset="100%" stop-color="#0d2a4a"/>
         </radialGradient>
+        <filter id="glow"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
       </defs>
-      <!-- Background circle -->
-      <circle cx="50" cy="50" r="48" fill="url(#bgM)" stroke="rgba(0,212,255,0.3)" stroke-width="1.5"/>
-      <!-- Neck -->
-      <rect x="41" y="72" width="18" height="14" rx="4" fill="url(#skinM)"/>
-      <!-- Shoulders -->
-      <ellipse cx="50" cy="90" rx="28" ry="10" fill="#1a3a5a"/>
-      <!-- Head group -->
-      <g class="avatar-head" id="avatarHead">
+      <!-- Glow ring -->
+      <ellipse cx="80" cy="75" rx="46" ry="46" fill="none" stroke="rgba(0,212,255,0.2)" stroke-width="1.5" filter="url(#glow)"/>
+
+      <g class="avatar-body">
+        <!-- Torso / shirt -->
+        <path d="M30 145 Q30 120 45 115 L58 110 L80 118 L102 110 L115 115 Q130 120 130 145 L130 220 L30 220Z" fill="url(#shirtM)"/>
+        <!-- Shirt collar -->
+        <path d="M65 110 Q80 122 95 110" stroke="rgba(255,255,255,0.2)" stroke-width="1.5" fill="none"/>
+        <!-- Shirt detail lines -->
+        <path d="M60 130 L60 170" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+        <path d="M100 130 L100 170" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+        <!-- EN-FORMA text on shirt -->
+        <text x="80" y="155" text-anchor="middle" fill="rgba(0,212,255,0.5)" font-size="7" font-family="Rajdhani,sans-serif" letter-spacing="1">EN-FORMA</text>
+
+        <!-- Left arm (right side of screen) -->
+        <g class="arm-l">
+          <path d="M114 115 Q132 118 136 135 Q140 150 134 165 Q130 175 126 170 Q122 155 118 140 Q114 128 114 115Z" fill="url(#skinM)"/>
+          <!-- forearm -->
+          <path d="M126 170 Q128 185 124 195 Q120 200 118 196 Q116 182 118 168Z" fill="url(#skinM)"/>
+          <!-- hand -->
+          <ellipse cx="121" cy="198" rx="7" ry="5" fill="url(#skinM)"/>
+        </g>
+
+        <!-- Right arm -->
+        <g class="arm-r">
+          <path d="M46 115 Q28 118 24 135 Q20 150 26 165 Q30 175 34 170 Q38 155 42 140 Q46 128 46 115Z" fill="url(#skinM)"/>
+          <path d="M34 170 Q32 185 36 195 Q40 200 42 196 Q44 182 42 168Z" fill="url(#skinM)"/>
+          <ellipse cx="39" cy="198" rx="7" ry="5" fill="url(#skinM)"/>
+        </g>
+
+        <!-- Neck -->
+        <rect x="68" y="96" width="24" height="18" rx="6" fill="url(#skinM)"/>
+
         <!-- Head -->
-        <ellipse cx="50" cy="46" rx="24" ry="27" fill="url(#skinM)"/>
-        <!-- Hair -->
-        <ellipse cx="50" cy="22" rx="24" ry="10" fill="#2a1a0a"/>
-        <rect x="26" y="20" width="48" height="8" fill="#2a1a0a" rx="2"/>
-        <ellipse cx="26" cy="35" rx="5" ry="12" fill="#2a1a0a"/>
-        <ellipse cx="74" cy="35" rx="5" ry="12" fill="#2a1a0a"/>
-        <!-- Eyebrows -->
-        <path class="eyebrow-l" d="M33 35 Q38 31 43 34" stroke="#2a1a0a" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-        <path class="eyebrow-r" d="M57 34 Q62 31 67 35" stroke="#2a1a0a" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-        <!-- Eyes -->
-        <g class="eye-left"><ellipse cx="38" cy="41" rx="5" ry="5.5" fill="white"/><circle cx="39" cy="41" r="3" fill="#1a3a6a"/><circle cx="39" cy="41" r="1.5" fill="#000"/><circle cx="40.5" cy="39.5" r="1" fill="white"/></g>
-        <g class="eye-right"><ellipse cx="62" cy="41" rx="5" ry="5.5" fill="white"/><circle cx="63" cy="41" r="3" fill="#1a3a6a"/><circle cx="63" cy="41" r="1.5" fill="#000"/><circle cx="64.5" cy="39.5" r="1" fill="white"/></g>
-        <!-- Nose -->
-        <path d="M50 44 Q47 52 44 54 Q50 56 56 54 Q53 52 50 44" fill="#c07845" opacity=".6"/>
-        <!-- Mouth -->
-        <path id="mouthM" d="M40 62 Q50 68 60 62" stroke="#8a4020" stroke-width="2" fill="none" stroke-linecap="round"/>
-        <!-- Jaw highlight -->
-        <ellipse cx="50" cy="68" rx="16" ry="5" fill="#c07845" opacity=".2"/>
-        <!-- Stubble hint -->
-        <ellipse cx="50" cy="64" rx="14" ry="6" fill="#9a6030" opacity=".15"/>
+        <g class="avatar-head">
+          <!-- Shadow under jaw -->
+          <ellipse cx="80" cy="94" rx="34" ry="6" fill="rgba(0,0,0,0.3)"/>
+          <!-- Head shape -->
+          <ellipse cx="80" cy="60" rx="34" ry="38" fill="url(#skinM)"/>
+          <!-- Hair -->
+          <path d="M46 52 Q46 18 80 16 Q114 18 114 52 Q110 38 80 36 Q50 38 46 52Z" fill="#1a0f05"/>
+          <path d="M46 52 Q43 60 45 68" stroke="#1a0f05" stroke-width="6" fill="none" stroke-linecap="round"/>
+          <path d="M114 52 Q117 60 115 68" stroke="#1a0f05" stroke-width="6" fill="none" stroke-linecap="round"/>
+          <!-- Ear L -->
+          <ellipse cx="114" cy="62" rx="5" ry="7" fill="#d4956a"/>
+          <!-- Ear R -->
+          <ellipse cx="46" cy="62" rx="5" ry="7" fill="#d4956a"/>
+          <!-- Eyebrow L -->
+          <path d="M60 44 Q70 39 78 42" stroke="#2a1505" stroke-width="2.8" fill="none" stroke-linecap="round"/>
+          <!-- Eyebrow R -->
+          <path d="M82 42 Q90 39 100 44" stroke="#2a1505" stroke-width="2.8" fill="none" stroke-linecap="round"/>
+          <!-- Eye L -->
+          <g class="eye-l">
+            <ellipse cx="69" cy="55" rx="8" ry="7" fill="white"/>
+            <circle cx="71" cy="55" r="4.5" fill="#1a3a6a"/>
+            <circle cx="71" cy="55" r="2.5" fill="#050d18"/>
+            <circle cx="73" cy="53" r="1.5" fill="white"/>
+            <!-- Upper eyelid -->
+            <path d="M61 52 Q69 48 77 52" stroke="#1a0f05" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+          </g>
+          <!-- Eye R -->
+          <g class="eye-r">
+            <ellipse cx="91" cy="55" rx="8" ry="7" fill="white"/>
+            <circle cx="89" cy="55" r="4.5" fill="#1a3a6a"/>
+            <circle cx="89" cy="55" r="2.5" fill="#050d18"/>
+            <circle cx="91" cy="53" r="1.5" fill="white"/>
+            <path d="M83 52 Q91 48 99 52" stroke="#1a0f05" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+          </g>
+          <!-- Nose -->
+          <path d="M80 58 Q76 68 73 71 Q80 74 87 71 Q84 68 80 58Z" fill="#c07845" opacity=".5"/>
+          <!-- Mouth -->
+          <path id="mouthM" d="M68 82 Q80 90 92 82" stroke="#8a3820" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+          <!-- Upper lip -->
+          <path d="M70 81 Q75 78 80 80 Q85 78 90 81" fill="#c06050" opacity=".6"/>
+          <!-- Chin shadow -->
+          <ellipse cx="80" cy="90" rx="20" ry="5" fill="rgba(0,0,0,0.12)"/>
+          <!-- Jaw highlight -->
+          <ellipse cx="80" cy="88" rx="24" ry="8" fill="#e8a878" opacity=".15"/>
+        </g>
       </g>
     </svg>`;
 
-    const avatarFem = `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    const avatarFem = `<svg viewBox="0 0 160 220" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <radialGradient id="skinF" cx="50%" cy="40%" r="55%">
-          <stop offset="0%" stop-color="#e8b090"/>
-          <stop offset="100%" stop-color="#d4856a"/>
+        <radialGradient id="skinF" cx="50%" cy="35%" r="60%">
+          <stop offset="0%" stop-color="#f5c8a0"/>
+          <stop offset="100%" stop-color="#e0a070"/>
         </radialGradient>
-        <radialGradient id="bgF" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stop-color="#2a1a3a"/>
-          <stop offset="100%" stop-color="#150d20"/>
+        <radialGradient id="shirtF" cx="50%" cy="30%" r="70%">
+          <stop offset="0%" stop-color="#6a1a5a"/>
+          <stop offset="100%" stop-color="#3a0a30"/>
         </radialGradient>
+        <filter id="glowF"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
       </defs>
-      <circle cx="50" cy="50" r="48" fill="url(#bgF)" stroke="rgba(255,102,0,0.3)" stroke-width="1.5"/>
-      <rect x="41" y="72" width="18" height="14" rx="4" fill="url(#skinF)"/>
-      <ellipse cx="50" cy="90" rx="28" ry="10" fill="#3a1a4a"/>
-      <g class="avatar-head" id="avatarHead">
-        <ellipse cx="50" cy="46" rx="23" ry="26" fill="url(#skinF)"/>
-        <!-- Long hair back -->
-        <ellipse cx="50" cy="20" rx="25" ry="12" fill="#3a1505"/>
-        <path d="M25 28 Q20 55 24 80" stroke="#3a1505" stroke-width="10" fill="none" stroke-linecap="round"/>
-        <path d="M75 28 Q80 55 76 80" stroke="#3a1505" stroke-width="10" fill="none" stroke-linecap="round"/>
-        <rect x="25" y="18" width="50" height="10" fill="#3a1505" rx="2"/>
-        <!-- Eyebrows (thin) -->
-        <path class="eyebrow-l" d="M34 34 Q39 30 44 33" stroke="#3a1505" stroke-width="1.8" fill="none" stroke-linecap="round"/>
-        <path class="eyebrow-r" d="M56 33 Q61 30 66 34" stroke="#3a1505" stroke-width="1.8" fill="none" stroke-linecap="round"/>
-        <!-- Eyes with lashes -->
-        <g class="eye-left"><ellipse cx="38" cy="40" rx="5.5" ry="5" fill="white"/><circle cx="39" cy="40" r="3" fill="#2d1a4a"/><circle cx="39" cy="40" r="1.5" fill="#000"/><circle cx="40.5" cy="38.5" r="1" fill="white"/>
-        <path d="M32.5 37 L33.5 35 M35 36 L35.5 34 M38 35.5 L38 33.5 M41 36 L41.5 34 M43.5 37 L44.5 35.5" stroke="#1a0a2a" stroke-width="1.2" stroke-linecap="round"/></g>
-        <g class="eye-right"><ellipse cx="62" cy="40" rx="5.5" ry="5" fill="white"/><circle cx="63" cy="40" r="3" fill="#2d1a4a"/><circle cx="63" cy="40" r="1.5" fill="#000"/><circle cx="64.5" cy="38.5" r="1" fill="white"/>
-        <path d="M56.5 37 L57.5 35.5 M59 36 L59.5 34 M62 35.5 L62 33.5 M65 36 L65.5 34 M67.5 37 L68.5 35.5" stroke="#1a0a2a" stroke-width="1.2" stroke-linecap="round"/></g>
-        <!-- Nose (delicate) -->
-        <path d="M50 43 Q48 50 46 52 Q50 54 54 52 Q52 50 50 43" fill="#c07060" opacity=".4"/>
-        <!-- Lips -->
-        <path d="M42 61 Q46 58 50 59 Q54 58 58 61" fill="#d4506a" stroke="none"/>
-        <path id="mouthF" d="M42 61 Q50 67 58 61" stroke="#b03050" stroke-width="1.5" fill="#d4506a" opacity=".8"/>
-        <!-- Cheek blush -->
-        <ellipse cx="30" cy="50" rx="7" ry="5" fill="#ff8080" opacity=".15"/>
-        <ellipse cx="70" cy="50" rx="7" ry="5" fill="#ff8080" opacity=".15"/>
+      <ellipse cx="80" cy="75" rx="46" ry="46" fill="none" stroke="rgba(255,102,0,0.2)" stroke-width="1.5" filter="url(#glowF)"/>
+
+      <g class="avatar-body">
+        <!-- Torso -->
+        <path d="M35 148 Q32 122 47 116 L60 111 L80 120 L100 111 L113 116 Q128 122 125 148 L125 220 L35 220Z" fill="url(#shirtF)"/>
+        <path d="M67 111 Q80 123 93 111" stroke="rgba(255,255,255,0.25)" stroke-width="1.5" fill="none"/>
+        <text x="80" y="158" text-anchor="middle" fill="rgba(255,102,0,0.5)" font-size="7" font-family="Rajdhani,sans-serif" letter-spacing="1">EN-FORMA</text>
+
+        <!-- Arm L -->
+        <g class="arm-l">
+          <path d="M112 116 Q130 120 134 137 Q137 152 131 166 Q127 175 123 170 Q120 155 116 140 Q112 128 112 116Z" fill="url(#skinF)"/>
+          <path d="M123 170 Q125 184 121 194 Q117 199 115 195 Q114 181 116 168Z" fill="url(#skinF)"/>
+          <ellipse cx="118" cy="197" rx="7" ry="5" fill="url(#skinF)"/>
+        </g>
+        <!-- Arm R -->
+        <g class="arm-r">
+          <path d="M48 116 Q30 120 26 137 Q23 152 29 166 Q33 175 37 170 Q40 155 44 140 Q48 128 48 116Z" fill="url(#skinF)"/>
+          <path d="M37 170 Q35 184 39 194 Q43 199 45 195 Q46 181 44 168Z" fill="url(#skinF)"/>
+          <ellipse cx="42" cy="197" rx="7" ry="5" fill="url(#skinF)"/>
+        </g>
+
+        <!-- Neck -->
+        <rect x="69" y="97" width="22" height="17" rx="6" fill="url(#skinF)"/>
+
+        <g class="avatar-head">
+          <ellipse cx="80" cy="95" rx="32" ry="5" fill="rgba(0,0,0,0.25)"/>
+          <!-- Head -->
+          <ellipse cx="80" cy="58" rx="32" ry="37" fill="url(#skinF)"/>
+          <!-- Long hair back -->
+          <ellipse cx="80" cy="20" rx="33" ry="14" fill="#2a0d04"/>
+          <path d="M48 30 Q40 65 44 100" stroke="#2a0d04" stroke-width="14" fill="none" stroke-linecap="round"/>
+          <path d="M112 30 Q120 65 116 100" stroke="#2a0d04" stroke-width="14" fill="none" stroke-linecap="round"/>
+          <rect x="47" y="18" width="66" height="14" fill="#2a0d04" rx="4"/>
+          <!-- Ear -->
+          <ellipse cx="112" cy="60" rx="5" ry="7" fill="#e0a070"/>
+          <ellipse cx="48" cy="60" rx="5" ry="7" fill="#e0a070"/>
+          <!-- Thin eyebrows -->
+          <path d="M61 42 Q70 37 78 40" stroke="#2a0d04" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <path d="M82 40 Q90 37 99 42" stroke="#2a0d04" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <!-- Eye L with lashes -->
+          <g class="eye-l">
+            <ellipse cx="69" cy="53" rx="8.5" ry="7" fill="white"/>
+            <circle cx="71" cy="53" r="4.5" fill="#3d1a5a"/>
+            <circle cx="71" cy="53" r="2.5" fill="#0d0515"/>
+            <circle cx="73" cy="51" r="1.5" fill="white"/>
+            <path d="M60.5 49 Q65 45 69 47 Q73 45 77.5 49" stroke="#1a0a2a" stroke-width="2" fill="none" stroke-linecap="round"/>
+            <!-- lashes -->
+            <path d="M61 50 L59 47M64 48 L63 45M68 47 L68 44M72 48 L73 45M76 50 L78 47" stroke="#1a0a2a" stroke-width="1.2" stroke-linecap="round"/>
+          </g>
+          <!-- Eye R -->
+          <g class="eye-r">
+            <ellipse cx="91" cy="53" rx="8.5" ry="7" fill="white"/>
+            <circle cx="89" cy="53" r="4.5" fill="#3d1a5a"/>
+            <circle cx="89" cy="53" r="2.5" fill="#0d0515"/>
+            <circle cx="91" cy="51" r="1.5" fill="white"/>
+            <path d="M82.5 49 Q87 45 91 47 Q95 45 99.5 49" stroke="#1a0a2a" stroke-width="2" fill="none" stroke-linecap="round"/>
+            <path d="M83 50 L81 47M86 48 L85 45M90 47 L90 44M94 48 L95 45M98 50 L100 47" stroke="#1a0a2a" stroke-width="1.2" stroke-linecap="round"/>
+          </g>
+          <!-- Nose -->
+          <path d="M80 56 Q77 65 74 68 Q80 70 86 68 Q83 65 80 56Z" fill="#c07060" opacity=".4"/>
+          <!-- Lips -->
+          <path d="M69 79 Q74 75 80 77 Q86 75 91 79 Q86 78 80 79 Q74 78 69 79Z" fill="#d45070"/>
+          <path id="mouthF" d="M69 79 Q80 88 91 79" stroke="#b03055" stroke-width="2" fill="rgba(212,80,112,0.6)" stroke-linecap="round"/>
+          <!-- Cheek blush -->
+          <ellipse cx="58" cy="65" rx="9" ry="6" fill="#ff7090" opacity=".12"/>
+          <ellipse cx="102" cy="65" rx="9" ry="6" fill="#ff7090" opacity=".12"/>
+          <!-- Chin shadow -->
+          <ellipse cx="80" cy="90" rx="18" ry="4" fill="rgba(0,0,0,0.1)"/>
+        </g>
       </g>
     </svg>`;
 
@@ -1402,9 +1516,6 @@ app.get('/dashboard', async (req, res) => {
         </div>
         <div class="topbar-brand">EN-FORMA AI</div>
         <div class="topbar-actions">
-            <button class="msg-btn" onclick="toggleCrono()" id="btnCronoTop" title="Cronómetro">
-                ⏱
-            </button>
             <button class="msg-btn" onclick="abrirMensajes()" title="Mensajes y soporte">
                 💬
                 ${noLeidos > 0 ? `<span class="msg-badge">${noLeidos}</span>` : ''}
@@ -1416,43 +1527,6 @@ app.get('/dashboard', async (req, res) => {
         </div>
     </div>
 
-    <!-- MODAL CRONÓMETRO -->
-    <div class="mo" id="modal-crono" style="align-items:flex-start;justify-content:flex-end;padding:60px 16px 0;">
-        <div class="mb2" style="max-width:340px;width:100%;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-                <div class="mo-t" style="margin-bottom:0;">⏱ CRONÓMETRO</div>
-                <button class="sec" style="width:auto;padding:6px 12px;font-size:.8em;" onclick="document.getElementById('modal-crono').classList.remove('open')">✕</button>
-            </div>
-            <!-- Mini avatar -->
-            <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;padding:10px;background:rgba(0,212,255,0.05);border-radius:12px;border:1px solid rgba(0,212,255,0.1);">
-                <div style="width:56px;height:56px;flex-shrink:0;">${avatarSVG}</div>
-                <div>
-                    <div style="font-family:'Rajdhani',sans-serif;font-size:.9em;color:var(--accent);font-weight:700;">${trainerName}</div>
-                    <div style="font-size:.72em;color:var(--muted);" id="cronoTrainerStatus">Listo para entrenar</div>
-                </div>
-            </div>
-            <div class="crono-display" id="cronoDisplay">00:00:00</div>
-            <div class="crono-preset" style="margin-top:10px;">
-                <button class="cpbtn" onclick="setPreset(30)">30m</button>
-                <button class="cpbtn" onclick="setPreset(45)">45m</button>
-                <button class="cpbtn" onclick="setPreset(60)">60m</button>
-                <button class="cpbtn" onclick="setPreset(75)">75m</button>
-                <button class="cpbtn" onclick="setPreset(90)">90m</button>
-            </div>
-            <div class="crono-input-row" style="margin-top:10px;">
-                <input type="number" id="cronoH" min="0" max="9" value="0" placeholder="HH">
-                <span style="color:var(--muted);font-size:1.4em;">:</span>
-                <input type="number" id="cronoM" min="0" max="59" value="${{'Perder PESO':45,'Ganar MÚSCULO':60,'Mejorar RESISTENCIA':75,'Tonificar el CUERPO':50,'Mantenerse en FORMA':45}[user.objetivo] || 45}" placeholder="MM">
-                <span style="color:var(--muted);font-size:1.4em;">:</span>
-                <input type="number" id="cronoS" min="0" max="59" value="0" placeholder="SS">
-            </div>
-            <div class="crono-btns">
-                <button onclick="cronoStart()" class="orange" id="btnStart">▶ Iniciar</button>
-                <button onclick="cronoPause()" class="sec" id="btnPause" style="display:none;">⏸ Pausar</button>
-                <button onclick="cronoReset()" class="sec">↺</button>
-            </div>
-        </div>
-    </div>
     <div class="mo" id="modal-msg">
         <div class="mb2" style="max-width:500px;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
@@ -1478,7 +1552,44 @@ app.get('/dashboard', async (req, res) => {
         </div>
     </div>
 
-    <div class="wrap">
+    <div class="main-layout">
+        <!-- PANEL LATERAL FIJO -->
+        <div class="side-panel">
+            <!-- AVATAR -->
+            <div class="avatar-panel">
+                ${avatarSVG}
+                <div class="trainer-name">${trainerName}</div>
+                <div class="trainer-status" id="trainerStatus">Listo para entrenar 💪</div>
+                <button class="trainer-speak-btn" id="btnHablar" onclick="toggleHablar()">🔊 Escuchar hoy</button>
+            </div>
+            <!-- CRONÓMETRO -->
+            <div class="crono-panel">
+                <div class="crono-label">⏱ CRONÓMETRO</div>
+                <div class="crono-display" id="cronoDisplay">00:00:00</div>
+                <div class="crono-preset">
+                    <button class="cpbtn" onclick="setPreset(30,event)">30m</button>
+                    <button class="cpbtn" onclick="setPreset(45,event)">45m</button>
+                    <button class="cpbtn" onclick="setPreset(60,event)">60m</button>
+                    <button class="cpbtn" onclick="setPreset(75,event)">75m</button>
+                    <button class="cpbtn" onclick="setPreset(90,event)">90m</button>
+                </div>
+                <div class="crono-input-row">
+                    <input type="number" id="cronoH" min="0" max="9" value="0" placeholder="HH">
+                    <span>:</span>
+                    <input type="number" id="cronoM" min="0" max="59" value="${{'Perder PESO':45,'Ganar MÚSCULO':60,'Mejorar RESISTENCIA':75,'Tonificar el CUERPO':50,'Mantenerse en FORMA':45}[user.objetivo]||45}" placeholder="MM">
+                    <span>:</span>
+                    <input type="number" id="cronoS" min="0" max="59" value="0" placeholder="SS">
+                </div>
+                <div class="crono-btns">
+                    <button onclick="cronoStart()" class="orange" id="btnStart">▶</button>
+                    <button onclick="cronoPause()" class="sec" id="btnPause" style="display:none;">⏸</button>
+                    <button onclick="cronoReset()" class="sec">↺</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- CONTENIDO PRINCIPAL -->
+        <div class="main-content">
 
         <!-- STATS 2x2 -->
         <div class="stats">
@@ -1530,16 +1641,6 @@ app.get('/dashboard', async (req, res) => {
             </div>
         </div>
 
-        <!-- ENTRENADOR + RUTINA -->
-        <div class="trainer-wrap">
-            <div class="trainer-avatar" id="trainerAvatar">${avatarSVG}</div>
-            <div class="trainer-info">
-                <div class="trainer-name">${trainerName}</div>
-                <div class="trainer-status" id="trainerStatus">Selecciona un día para empezar</div>
-                <button class="trainer-speak-btn" id="btnHablar" onclick="toggleHablar()">🔊 Escuchar hoy</button>
-            </div>
-        </div>
-
         <div class="card hl">
             <div class="card-t" style="flex-wrap:wrap;gap:8px;">
                 <span>🤖 TU PLAN SEMANAL</span>
@@ -1572,7 +1673,8 @@ app.get('/dashboard', async (req, res) => {
             <p style="color:var(--muted);font-size:.78em;margin-top:10px;text-align:center;">📂 Ver notas guardadas → abre el menú ☰</p>
         </div>
 
-    </div><!-- /wrap -->
+        </div><!-- /main-content -->
+    </div><!-- /main-layout -->
 
     <!-- SPINNER -->
     <div class="spin-overlay" id="spinner">
@@ -1767,24 +1869,23 @@ app.get('/dashboard', async (req, res) => {
     function animateMouth(active) {
         const el = document.getElementById('mouthM') || document.getElementById('mouthF');
         if (!el) return;
+        clearInterval(mouthInterval);
+        mouthInterval = null;
         if (!active) {
-            clearInterval(mouthInterval);
-            mouthInterval = null;
             const isFem = !!document.getElementById('mouthF');
-            el.setAttribute('d', isFem
-                ? 'M42 61 Q50 67 58 61'
-                : 'M40 62 Q50 68 60 62');
+            el.setAttribute('d', isFem ? 'M69 79 Q80 88 91 79' : 'M68 82 Q80 90 92 82');
             return;
         }
         const isFem = !!document.getElementById('mouthF');
-        const shapes = isFem
-            ? ['M42 61 Q50 67 58 61','M42 61 Q50 64 58 61','M42 62 Q50 69 58 62','M43 61 Q50 65 57 61','M42 61 Q50 66 58 61']
-            : ['M40 62 Q50 68 60 62','M40 62 Q50 65 60 62','M40 63 Q50 70 60 63','M41 62 Q50 66 59 62','M40 62 Q50 67 60 62'];
+        const open  = isFem ? 'M69 79 Q80 90 91 79' : 'M68 82 Q80 92 92 82';
+        const mid   = isFem ? 'M69 79 Q80 86 91 79' : 'M68 82 Q80 88 92 82';
+        const close2 = isFem ? 'M70 80 Q80 84 90 80' : 'M69 83 Q80 86 91 83';
+        const shapes = [open, mid, close2, mid, open, close2, mid, open];
         let si = 0;
         mouthInterval = setInterval(() => {
             el.setAttribute('d', shapes[si % shapes.length]);
             si++;
-        }, 120);
+        }, 100);
     }
 
     function leer() {
@@ -1836,16 +1937,28 @@ app.get('/dashboard', async (req, res) => {
 
     function loadVoices() {
         voices = window.speechSynthesis.getVoices();
-        const esp = voices.filter(v => v.lang.startsWith('es') || v.lang.startsWith('Es'));
-        vocesMasculinas = esp.filter(v => /male|hombre|diego|pablo|jorge|miguel/i.test(v.name));
-        vocesFemeninas = esp.filter(v => /female|mujer|marta|laura|paulina|Monica|helena/i.test(v.name));
+        const esp = voices.filter(v => v.lang.startsWith('es'));
+        // Priorizar voces neurales/naturales de Google y Microsoft
+        const neuralKeywords = /google|neural|natural|premium|enhanced|microsoft/i;
+        const maleKeywords = /male|pablo|diego|jorge|miguel|carlos|juan|alvaro/i;
+        const femaleKeywords = /female|marta|laura|helena|mónica|paulina|sabina|elvira/i;
+
+        vocesMasculinas = esp.filter(v => maleKeywords.test(v.name))
+            .sort((a,b) => neuralKeywords.test(b.name) ? 1 : -1);
+        vocesFemeninas = esp.filter(v => femaleKeywords.test(v.name))
+            .sort((a,b) => neuralKeywords.test(b.name) ? 1 : -1);
+
+        // Si no hay con keywords, tomar las primeras neurales disponibles
+        if (!vocesMasculinas.length) vocesMasculinas = esp.filter(v => neuralKeywords.test(v.name));
+        if (!vocesFemeninas.length) vocesFemeninas = [...esp].reverse().filter(v => neuralKeywords.test(v.name));
+
         const sel = document.getElementById('voiceSelect');
         if (!sel) return;
         sel.innerHTML = '';
         esp.forEach((v, i) => {
             const opt = document.createElement('option');
             opt.value = i;
-            opt.textContent = v.name + ' (' + v.lang + ')';
+            opt.textContent = v.name + (neuralKeywords.test(v.name) ? ' ⭐' : '');
             sel.appendChild(opt);
         });
         updateVoice();
@@ -1884,7 +1997,7 @@ app.get('/dashboard', async (req, res) => {
     let currentMusic = null;
     const streams = {
         feng:    'https://streams.ilovemusic.de/iloveradio17.mp3',
-        clasica: 'https://stream.srg-ssr.ch/rsc_de/mp3_128.m3u8',
+        clasica: 'https://icecast.radiofrance.fr/francemusique-midfi.mp3',
         rock:    'https://streams.ilovemusic.de/iloveradio1.mp3'
     };
 
@@ -1941,12 +2054,13 @@ app.get('/dashboard', async (req, res) => {
     const sugerido = tiempoSugerido['${user.objetivo}'] || 45;
     document.getElementById('cronoM').value = sugerido;
 
-    function setPreset(mins) {
+    function setPreset(mins, e) {
         document.querySelectorAll('.cpbtn').forEach(b => b.classList.remove('on'));
-        event.target.classList.add('on');
+        if (e && e.target) e.target.classList.add('on');
         document.getElementById('cronoH').value = 0;
         document.getElementById('cronoM').value = mins;
         document.getElementById('cronoS').value = 0;
+        actualizarDisplay(mins * 60);
         if (cronoInterval) cronoReset();
     }
 
