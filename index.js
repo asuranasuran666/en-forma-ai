@@ -100,21 +100,26 @@ function infoRango(n) {
 function buildPrompt(u) {
     const imc = calcIMC(u.peso, u.estatura);
     const { label: imcLabel } = infoIMC(imc);
-    return `Eres un médico deportivo y entrenador personal certificado. Tu misión es crear una rutina FITNESS completamente PERSONALIZADA y SEGURA.
+    const sinLesiones = !u.padecimientos || u.padecimientos.trim() === '' || u.padecimientos.toLowerCase().includes('ninguna') || u.padecimientos.toLowerCase().includes('no tengo');
+    return `Eres un médico deportivo y entrenador personal certificado de alto rendimiento. Crea una rutina FITNESS INTENSA y COMPLETA para 5 días.
 
-PERFIL DEL PACIENTE:
+PERFIL DEL ATLETA:
 - Nombre: ${u.nombre} | Sexo: ${u.sexo} | Edad: ${u.edad} años
-- Peso actual: ${u.peso}kg | Estatura: ${u.estatura}cm | IMC: ${imc} (${imcLabel})
-- Objetivo principal: ${u.objetivo}
-- Condiciones médicas / lesiones: ${u.padecimientos || 'Sin restricciones conocidas'}
+- Peso: ${u.peso}kg | Estatura: ${u.estatura}cm | IMC: ${imc} (${imcLabel})
+- Objetivo: ${u.objetivo}
+- Condición médica / lesiones: ${u.padecimientos || 'NINGUNA — atleta sano, puede trabajar al máximo'}
 
-INSTRUCCIONES OBLIGATORIAS:
-1. Si hay padecimientos o lesiones, analízalos con criterio médico y EXCLUYE todos los ejercicios que puedan causarles daño. Explica en 1-2 líneas por qué se evitan.
-2. Crea un plan semanal de 5 días (Lun-Vie) con descanso Sáb-Dom.
-3. Cada día debe incluir: calentamiento (5 min), ejercicios principales con series/reps, y enfriamiento (5 min).
-4. Adapta la intensidad al IMC y objetivo del paciente.
-5. Sé motivador, directo y profesional. Tutéa al paciente.
-6. Responde ÚNICAMENTE en HTML limpio. Usa SOLO estas etiquetas: <b>, <br>, <ul>, <li>, <h3>, <p>. Sin <html>, sin <head>, sin <body>, sin estilos inline.`;
+REGLAS OBLIGATORIAS:
+${sinLesiones
+    ? '- El atleta está SANO. Genera una rutina EXIGENTE con alto volumen de trabajo, series pesadas (4-5 series, 8-12 reps con carga progresiva), ejercicios compuestos, y ritmo intenso. No simplificar.'
+    : '- ANALIZA cada lesión/padecimiento con criterio médico y EXCLUYE ejercicios peligrosos. Explica brevemente por qué se evitan.'
+}
+- Plan de 5 días: Lunes, Martes, Miércoles, Jueves, Viernes. Sábado y Domingo descanso activo.
+- Cada día: calentamiento específico (5-8 min), bloque principal con 6-8 ejercicios mínimo, series/reps/descanso exactos, enfriamiento (5 min).
+- Varía los grupos musculares. No repetir los mismos ejercicios dos días seguidos.
+- Usa lenguaje motivador y directo. Tutea al usuario.
+- FORMATO OBLIGATORIO: Usa EXACTAMENTE estas etiquetas HTML: <h3> para cada día, <b> para nombres de ejercicios, <ul><li> para listas, <p> para texto. NADA más. Sin HTML, sin head, sin body, sin estilos.
+- Empieza DIRECTAMENTE con <h3>Lunes: [nombre del día]</h3> sin introducción previa.`;
 }
 
 async function getUser(req) {
@@ -1176,20 +1181,64 @@ app.get('/dashboard', async (req, res) => {
         ? user.consejo_ia
         : `<p style="color:var(--muted);">No se pudo generar la rutina. Usa el botón de abajo para generarla ahora.</p>`;
 
-    // Parsear días de la rutina
+    // Parsear días de la rutina — maneja h3, bullets y texto plano
     function parsearDias(html) {
         if (!html) return [];
-        // Buscar patrones de días (Lunes, Día 1, Day 1, etc.)
-        const partes = html.split(/<h3[^>]*>/i);
         const dias = [];
-        partes.forEach((p, i) => {
-            if (i === 0) return; // intro
-            const endH3 = p.indexOf('</h3>');
-            const titulo = endH3 > -1 ? p.substring(0, endH3).replace(/<[^>]+>/g, '') : 'Día ' + i;
-            const contenido = endH3 > -1 ? p.substring(endH3 + 5) : p;
-            dias.push({ titulo: titulo.trim(), contenido: `<h3>${titulo}</h3>${contenido}` });
-        });
-        return dias.length > 0 ? dias : [{ titulo: 'Tu Rutina', contenido: html }];
+        const diasNombres = ['Lunes','Martes','Miércoles','Miercoles','Jueves','Viernes','Sábado','Sabado','Domingo'];
+
+        // Intentar split por <h3> primero
+        if (html.includes('<h3')) {
+            const partes = html.split(/<h3[^>]*>/i).filter(Boolean);
+            partes.forEach((p, i) => {
+                if (i === 0 && !diasNombres.some(d => p.includes(d))) return;
+                const endH3 = p.indexOf('</h3>');
+                const titulo = endH3 > -1 ? p.substring(0, endH3).replace(/<[^>]+>/g,'').trim() : 'Día '+(i+1);
+                const contenido = endH3 > -1 ? p.substring(endH3+5) : p;
+                if (titulo) dias.push({ titulo, contenido: '<h3>'+titulo+'</h3>'+contenido });
+            });
+        }
+
+        // Si no encontró días, intentar split por nombre del día en texto plano/bullets
+        if (dias.length === 0) {
+            // Convertir bullets a HTML primero
+            let texto = html
+                .replace(/<br\s*\/?>/gi, '\n')
+                .replace(/<[^>]+>/g, '')
+                .replace(/&[a-z]+;/gi, ' ');
+
+            // Dividir por líneas que empiecen con nombre de día
+            const lineas = texto.split('\n');
+            let diaActual = null;
+            let contenidoActual = [];
+
+            lineas.forEach(linea => {
+                const limpia = linea.trim().replace(/^\*+\s*/, '');
+                const esDia = diasNombres.some(d => limpia.toLowerCase().startsWith(d.toLowerCase()));
+
+                if (esDia) {
+                    if (diaActual) {
+                        dias.push({
+                            titulo: diaActual,
+                            contenido: '<h3>'+diaActual+'</h3><ul>'+contenidoActual.map(l=>'<li>'+l+'</li>').join('')+'</ul>'
+                        });
+                    }
+                    diaActual = limpia.replace(/[:*]/g,'').trim();
+                    contenidoActual = [];
+                } else if (diaActual && limpia) {
+                    contenidoActual.push(limpia);
+                }
+            });
+
+            if (diaActual) {
+                dias.push({
+                    titulo: diaActual,
+                    contenido: '<h3>'+diaActual+'</h3><ul>'+contenidoActual.map(l=>'<li>'+l+'</li>').join('')+'</ul>'
+                });
+            }
+        }
+
+        return dias.length > 0 ? dias : [{ titulo: 'Tu Rutina Completa', contenido: html }];
     }
 
     const diasRutina = parsearDias(user.consejo_ia);
@@ -1200,181 +1249,212 @@ app.get('/dashboard', async (req, res) => {
     const esFemenino = user.sexo === 'Femenino';
     const trainerName = esFemenino ? 'Entrenadora Sofia' : 'Entrenador Marco';
 
-    const avatarMasc = `<svg viewBox="0 0 160 220" xmlns="http://www.w3.org/2000/svg">
+    const avatarMasc = `<svg viewBox="0 0 160 180" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <radialGradient id="skinM" cx="50%" cy="35%" r="60%">
-          <stop offset="0%" stop-color="#f0c090"/>
-          <stop offset="100%" stop-color="#d4956a"/>
+        <radialGradient id="skinM" cx="48%" cy="38%" r="58%">
+          <stop offset="0%" stop-color="#f2c490"/>
+          <stop offset="60%" stop-color="#d9956a"/>
+          <stop offset="100%" stop-color="#c07848"/>
         </radialGradient>
-        <radialGradient id="shirtM" cx="50%" cy="30%" r="70%">
-          <stop offset="0%" stop-color="#1a4a7a"/>
-          <stop offset="100%" stop-color="#0d2a4a"/>
+        <radialGradient id="hairM" cx="50%" cy="20%" r="65%">
+          <stop offset="0%" stop-color="#3a2010"/>
+          <stop offset="100%" stop-color="#1a0d05"/>
         </radialGradient>
-        <filter id="glow"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <radialGradient id="shirtM" cx="50%" cy="0%" r="100%">
+          <stop offset="0%" stop-color="#1e5080"/>
+          <stop offset="100%" stop-color="#0d2a45"/>
+        </radialGradient>
+        <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="rgba(0,0,0,0.4)"/>
+        </filter>
       </defs>
-      <!-- Glow ring -->
-      <ellipse cx="80" cy="75" rx="46" ry="46" fill="none" stroke="rgba(0,212,255,0.2)" stroke-width="1.5" filter="url(#glow)"/>
 
-      <g class="avatar-body">
-        <!-- Torso / shirt -->
-        <path d="M30 145 Q30 120 45 115 L58 110 L80 118 L102 110 L115 115 Q130 120 130 145 L130 220 L30 220Z" fill="url(#shirtM)"/>
-        <!-- Shirt collar -->
-        <path d="M65 110 Q80 122 95 110" stroke="rgba(255,255,255,0.2)" stroke-width="1.5" fill="none"/>
-        <!-- Shirt detail lines -->
-        <path d="M60 130 L60 170" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
-        <path d="M100 130 L100 170" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
-        <!-- EN-FORMA text on shirt -->
-        <text x="80" y="155" text-anchor="middle" fill="rgba(0,212,255,0.5)" font-size="7" font-family="Rajdhani,sans-serif" letter-spacing="1">EN-FORMA</text>
+      <!-- Glow ring behind head -->
+      <ellipse cx="80" cy="88" rx="62" ry="62" fill="none" stroke="rgba(0,212,255,0.12)" stroke-width="1"/>
 
-        <!-- Left arm (right side of screen) -->
-        <g class="arm-l">
-          <path d="M114 115 Q132 118 136 135 Q140 150 134 165 Q130 175 126 170 Q122 155 118 140 Q114 128 114 115Z" fill="url(#skinM)"/>
-          <!-- forearm -->
-          <path d="M126 170 Q128 185 124 195 Q120 200 118 196 Q116 182 118 168Z" fill="url(#skinM)"/>
-          <!-- hand -->
-          <ellipse cx="121" cy="198" rx="7" ry="5" fill="url(#skinM)"/>
+      <!-- Shirt/shoulders (just top) -->
+      <path d="M18 180 Q18 148 38 140 L58 132 L80 138 L102 132 L122 140 Q142 148 142 180Z" fill="url(#shirtM)"/>
+      <!-- collar -->
+      <path d="M64 132 Q80 144 96 132" stroke="rgba(255,255,255,0.18)" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <text x="80" y="168" text-anchor="middle" fill="rgba(0,212,255,0.4)" font-size="8" font-family="Rajdhani,sans-serif" letter-spacing="2">EN-FORMA</text>
+
+      <!-- Neck -->
+      <path d="M66 122 Q66 136 80 138 Q94 136 94 122 L90 118 L70 118Z" fill="url(#skinM)"/>
+
+      <!-- Head -->
+      <g class="avatar-head" filter="url(#softShadow)">
+        <!-- Jaw/chin shadow -->
+        <ellipse cx="80" cy="122" rx="44" ry="8" fill="rgba(0,0,0,0.18)"/>
+        <!-- Head shape - slightly wider jaw -->
+        <path d="M36 78 Q34 48 80 42 Q126 48 124 78 Q124 110 106 122 Q92 130 80 130 Q68 130 54 122 Q36 110 36 78Z" fill="url(#skinM)"/>
+
+        <!-- Hair top -->
+        <path d="M36 76 Q34 44 80 38 Q126 44 124 76 Q120 58 80 54 Q40 58 36 76Z" fill="url(#hairM)"/>
+        <!-- Hair sides -->
+        <path d="M36 76 Q32 86 34 96 Q33 88 36 80Z" fill="url(#hairM)"/>
+        <path d="M124 76 Q128 86 126 96 Q127 88 124 80Z" fill="url(#hairM)"/>
+        <!-- Hair fade/texture -->
+        <path d="M40 68 Q44 56 60 52 Q50 58 44 70Z" fill="rgba(0,0,0,0.15)"/>
+
+        <!-- Ear L -->
+        <ellipse cx="124" cy="84" rx="6" ry="9" fill="#c87848"/>
+        <ellipse cx="124" cy="84" rx="3.5" ry="6" fill="#b86838" opacity=".5"/>
+        <!-- Ear R -->
+        <ellipse cx="36" cy="84" rx="6" ry="9" fill="#c87848"/>
+        <ellipse cx="36" cy="84" rx="3.5" ry="6" fill="#b86838" opacity=".5"/>
+
+        <!-- Eyebrow L -->
+        <path d="M52 66 Q64 60 74 63" stroke="#1a0d05" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+        <!-- Eyebrow R -->
+        <path d="M86 63 Q96 60 108 66" stroke="#1a0d05" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+
+        <!-- Eye L -->
+        <g class="eye-l">
+          <ellipse cx="63" cy="78" rx="11" ry="9.5" fill="white"/>
+          <circle cx="65" cy="78" r="6" fill="#1a4080"/>
+          <circle cx="65" cy="78" r="3.5" fill="#050e1f"/>
+          <circle cx="67.5" cy="75.5" r="2" fill="white"/>
+          <circle cx="62" cy="77" r="1" fill="white" opacity=".6"/>
+          <!-- Eyelid -->
+          <path d="M52 74 Q63 68 74 74" stroke="#1a0d05" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+          <!-- Lower lid -->
+          <path d="M53 82 Q63 86 73 82" stroke="#c87848" stroke-width="1" fill="none" opacity=".4"/>
         </g>
 
-        <!-- Right arm -->
-        <g class="arm-r">
-          <path d="M46 115 Q28 118 24 135 Q20 150 26 165 Q30 175 34 170 Q38 155 42 140 Q46 128 46 115Z" fill="url(#skinM)"/>
-          <path d="M34 170 Q32 185 36 195 Q40 200 42 196 Q44 182 42 168Z" fill="url(#skinM)"/>
-          <ellipse cx="39" cy="198" rx="7" ry="5" fill="url(#skinM)"/>
+        <!-- Eye R -->
+        <g class="eye-r">
+          <ellipse cx="97" cy="78" rx="11" ry="9.5" fill="white"/>
+          <circle cx="95" cy="78" r="6" fill="#1a4080"/>
+          <circle cx="95" cy="78" r="3.5" fill="#050e1f"/>
+          <circle cx="97.5" cy="75.5" r="2" fill="white"/>
+          <circle cx="92" cy="77" r="1" fill="white" opacity=".6"/>
+          <path d="M86 74 Q97 68 108 74" stroke="#1a0d05" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+          <path d="M87 82 Q97 86 107 82" stroke="#c87848" stroke-width="1" fill="none" opacity=".4"/>
         </g>
 
-        <!-- Neck -->
-        <rect x="68" y="96" width="24" height="18" rx="6" fill="url(#skinM)"/>
+        <!-- Nose bridge -->
+        <path d="M78 82 L76 96 Q78 100 80 100 Q82 100 84 96 L82 82Z" fill="#b87040" opacity=".35"/>
+        <!-- Nose tip -->
+        <ellipse cx="80" cy="100" rx="8" ry="5" fill="#c07848" opacity=".5"/>
+        <circle cx="74" cy="100" r="3" fill="#b06838" opacity=".3"/>
+        <circle cx="86" cy="100" r="3" fill="#b06838" opacity=".3"/>
 
-        <!-- Head -->
-        <g class="avatar-head">
-          <!-- Shadow under jaw -->
-          <ellipse cx="80" cy="94" rx="34" ry="6" fill="rgba(0,0,0,0.3)"/>
-          <!-- Head shape -->
-          <ellipse cx="80" cy="60" rx="34" ry="38" fill="url(#skinM)"/>
-          <!-- Hair -->
-          <path d="M46 52 Q46 18 80 16 Q114 18 114 52 Q110 38 80 36 Q50 38 46 52Z" fill="#1a0f05"/>
-          <path d="M46 52 Q43 60 45 68" stroke="#1a0f05" stroke-width="6" fill="none" stroke-linecap="round"/>
-          <path d="M114 52 Q117 60 115 68" stroke="#1a0f05" stroke-width="6" fill="none" stroke-linecap="round"/>
-          <!-- Ear L -->
-          <ellipse cx="114" cy="62" rx="5" ry="7" fill="#d4956a"/>
-          <!-- Ear R -->
-          <ellipse cx="46" cy="62" rx="5" ry="7" fill="#d4956a"/>
-          <!-- Eyebrow L -->
-          <path d="M60 44 Q70 39 78 42" stroke="#2a1505" stroke-width="2.8" fill="none" stroke-linecap="round"/>
-          <!-- Eyebrow R -->
-          <path d="M82 42 Q90 39 100 44" stroke="#2a1505" stroke-width="2.8" fill="none" stroke-linecap="round"/>
-          <!-- Eye L -->
-          <g class="eye-l">
-            <ellipse cx="69" cy="55" rx="8" ry="7" fill="white"/>
-            <circle cx="71" cy="55" r="4.5" fill="#1a3a6a"/>
-            <circle cx="71" cy="55" r="2.5" fill="#050d18"/>
-            <circle cx="73" cy="53" r="1.5" fill="white"/>
-            <!-- Upper eyelid -->
-            <path d="M61 52 Q69 48 77 52" stroke="#1a0f05" stroke-width="1.8" fill="none" stroke-linecap="round"/>
-          </g>
-          <!-- Eye R -->
-          <g class="eye-r">
-            <ellipse cx="91" cy="55" rx="8" ry="7" fill="white"/>
-            <circle cx="89" cy="55" r="4.5" fill="#1a3a6a"/>
-            <circle cx="89" cy="55" r="2.5" fill="#050d18"/>
-            <circle cx="91" cy="53" r="1.5" fill="white"/>
-            <path d="M83 52 Q91 48 99 52" stroke="#1a0f05" stroke-width="1.8" fill="none" stroke-linecap="round"/>
-          </g>
-          <!-- Nose -->
-          <path d="M80 58 Q76 68 73 71 Q80 74 87 71 Q84 68 80 58Z" fill="#c07845" opacity=".5"/>
-          <!-- Mouth -->
-          <path id="mouthM" d="M68 82 Q80 90 92 82" stroke="#8a3820" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-          <!-- Upper lip -->
-          <path d="M70 81 Q75 78 80 80 Q85 78 90 81" fill="#c06050" opacity=".6"/>
-          <!-- Chin shadow -->
-          <ellipse cx="80" cy="90" rx="20" ry="5" fill="rgba(0,0,0,0.12)"/>
-          <!-- Jaw highlight -->
-          <ellipse cx="80" cy="88" rx="24" ry="8" fill="#e8a878" opacity=".15"/>
-        </g>
+        <!-- Philtrum -->
+        <path d="M77 104 Q80 108 83 104" stroke="#b07040" stroke-width="1" fill="none" opacity=".4"/>
+
+        <!-- Upper lip -->
+        <path d="M60 113 Q68 108 76 110 Q80 109 84 110 Q92 108 100 113" fill="#c06050" opacity=".7" stroke="none"/>
+        <!-- Mouth -->
+        <path id="mouthM" d="M62 113 Q80 123 98 113" stroke="#904030" stroke-width="2.5" fill="rgba(180,60,40,0.3)" stroke-linecap="round"/>
+
+        <!-- Chin cleft hint -->
+        <line x1="80" y1="126" x2="80" y2="130" stroke="#b07040" stroke-width="1.5" opacity=".25"/>
+        <!-- Cheek shadows -->
+        <ellipse cx="46" cy="94" rx="12" ry="8" fill="rgba(0,0,0,0.06)"/>
+        <ellipse cx="114" cy="94" rx="12" ry="8" fill="rgba(0,0,0,0.06)"/>
+        <!-- Highlight on forehead -->
+        <ellipse cx="74" cy="58" rx="14" ry="8" fill="rgba(255,255,255,0.06)"/>
       </g>
     </svg>`;
 
-    const avatarFem = `<svg viewBox="0 0 160 220" xmlns="http://www.w3.org/2000/svg">
+    const avatarFem = `<svg viewBox="0 0 160 180" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <radialGradient id="skinF" cx="50%" cy="35%" r="60%">
-          <stop offset="0%" stop-color="#f5c8a0"/>
-          <stop offset="100%" stop-color="#e0a070"/>
+        <radialGradient id="skinF" cx="48%" cy="38%" r="58%">
+          <stop offset="0%" stop-color="#f8d0a8"/>
+          <stop offset="60%" stop-color="#e8a878"/>
+          <stop offset="100%" stop-color="#d08858"/>
         </radialGradient>
-        <radialGradient id="shirtF" cx="50%" cy="30%" r="70%">
-          <stop offset="0%" stop-color="#6a1a5a"/>
-          <stop offset="100%" stop-color="#3a0a30"/>
+        <radialGradient id="hairF" cx="50%" cy="15%" r="70%">
+          <stop offset="0%" stop-color="#4a1a08"/>
+          <stop offset="100%" stop-color="#220a02"/>
         </radialGradient>
-        <filter id="glowF"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+        <radialGradient id="shirtF" cx="50%" cy="0%" r="100%">
+          <stop offset="0%" stop-color="#782080"/>
+          <stop offset="100%" stop-color="#3a0840"/>
+        </radialGradient>
+        <filter id="softShadowF" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="rgba(0,0,0,0.35)"/>
+        </filter>
       </defs>
-      <ellipse cx="80" cy="75" rx="46" ry="46" fill="none" stroke="rgba(255,102,0,0.2)" stroke-width="1.5" filter="url(#glowF)"/>
 
-      <g class="avatar-body">
-        <!-- Torso -->
-        <path d="M35 148 Q32 122 47 116 L60 111 L80 120 L100 111 L113 116 Q128 122 125 148 L125 220 L35 220Z" fill="url(#shirtF)"/>
-        <path d="M67 111 Q80 123 93 111" stroke="rgba(255,255,255,0.25)" stroke-width="1.5" fill="none"/>
-        <text x="80" y="158" text-anchor="middle" fill="rgba(255,102,0,0.5)" font-size="7" font-family="Rajdhani,sans-serif" letter-spacing="1">EN-FORMA</text>
+      <ellipse cx="80" cy="88" rx="62" ry="62" fill="none" stroke="rgba(255,102,0,0.12)" stroke-width="1"/>
 
-        <!-- Arm L -->
-        <g class="arm-l">
-          <path d="M112 116 Q130 120 134 137 Q137 152 131 166 Q127 175 123 170 Q120 155 116 140 Q112 128 112 116Z" fill="url(#skinF)"/>
-          <path d="M123 170 Q125 184 121 194 Q117 199 115 195 Q114 181 116 168Z" fill="url(#skinF)"/>
-          <ellipse cx="118" cy="197" rx="7" ry="5" fill="url(#skinF)"/>
+      <!-- Shirt -->
+      <path d="M20 180 Q20 150 40 142 L60 134 L80 140 L100 134 L120 142 Q140 150 140 180Z" fill="url(#shirtF)"/>
+      <path d="M66 134 Q80 146 94 134" stroke="rgba(255,255,255,0.22)" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <text x="80" y="168" text-anchor="middle" fill="rgba(255,102,0,0.4)" font-size="8" font-family="Rajdhani,sans-serif" letter-spacing="2">EN-FORMA</text>
+
+      <!-- Neck -->
+      <path d="M68 120 Q68 136 80 140 Q92 136 92 120 L88 116 L72 116Z" fill="url(#skinF)"/>
+
+      <g class="avatar-head" filter="url(#softShadowF)">
+        <ellipse cx="80" cy="120" rx="40" ry="7" fill="rgba(0,0,0,0.15)"/>
+
+        <!-- Long hair back layer -->
+        <path d="M30 72 Q26 110 30 148" stroke="url(#hairF)" stroke-width="20" fill="none" stroke-linecap="round" opacity=".95"/>
+        <path d="M130 72 Q134 110 130 148" stroke="url(#hairF)" stroke-width="20" fill="none" stroke-linecap="round" opacity=".95"/>
+
+        <!-- Head shape - softer oval -->
+        <path d="M40 78 Q38 50 80 44 Q122 50 120 78 Q120 108 104 120 Q92 128 80 128 Q68 128 56 120 Q40 108 40 78Z" fill="url(#skinF)"/>
+
+        <!-- Hair top/crown -->
+        <path d="M40 76 Q38 46 80 40 Q122 46 120 76 Q116 56 80 52 Q44 56 40 76Z" fill="url(#hairF)"/>
+        <!-- Hair part highlight -->
+        <line x1="80" y1="40" x2="80" y2="58" stroke="rgba(255,255,255,0.08)" stroke-width="2"/>
+
+        <!-- Ear -->
+        <ellipse cx="120" cy="82" rx="5.5" ry="8" fill="#d08858"/>
+        <ellipse cx="40" cy="82" rx="5.5" ry="8" fill="#d08858"/>
+
+        <!-- Thin arched eyebrows -->
+        <path d="M54 64 Q65 57 75 61" stroke="#220a02" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+        <path d="M85 61 Q95 57 106 64" stroke="#220a02" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+
+        <!-- Eye L with lashes -->
+        <g class="eye-l">
+          <ellipse cx="64" cy="76" rx="11" ry="9" fill="white"/>
+          <circle cx="66" cy="76" r="6" fill="#4a1870"/>
+          <circle cx="66" cy="76" r="3.5" fill="#0e0518"/>
+          <circle cx="68.5" cy="73.5" r="2" fill="white"/>
+          <circle cx="63" cy="75" r="1" fill="white" opacity=".6"/>
+          <!-- Upper eyelid + lashes -->
+          <path d="M53 72 Q64 65 75 72" stroke="#1a0828" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+          <path d="M54 72 L52 68M58 69 L57 65M63 67 L63 63M68 68 L69 64M73 70 L75 67" stroke="#1a0828" stroke-width="1.4" stroke-linecap="round"/>
+          <!-- Lower lid -->
+          <path d="M54 80 Q64 85 74 80" stroke="#d08858" stroke-width="1" fill="none" opacity=".35"/>
         </g>
-        <!-- Arm R -->
-        <g class="arm-r">
-          <path d="M48 116 Q30 120 26 137 Q23 152 29 166 Q33 175 37 170 Q40 155 44 140 Q48 128 48 116Z" fill="url(#skinF)"/>
-          <path d="M37 170 Q35 184 39 194 Q43 199 45 195 Q46 181 44 168Z" fill="url(#skinF)"/>
-          <ellipse cx="42" cy="197" rx="7" ry="5" fill="url(#skinF)"/>
+
+        <!-- Eye R -->
+        <g class="eye-r">
+          <ellipse cx="96" cy="76" rx="11" ry="9" fill="white"/>
+          <circle cx="94" cy="76" r="6" fill="#4a1870"/>
+          <circle cx="94" cy="76" r="3.5" fill="#0e0518"/>
+          <circle cx="96.5" cy="73.5" r="2" fill="white"/>
+          <circle cx="91" cy="75" r="1" fill="white" opacity=".6"/>
+          <path d="M85 72 Q96 65 107 72" stroke="#1a0828" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+          <path d="M86 72 L84 68M90 69 L89 65M95 67 L95 63M100 68 L101 64M105 70 L107 67" stroke="#1a0828" stroke-width="1.4" stroke-linecap="round"/>
+          <path d="M86 80 Q96 85 106 80" stroke="#d08858" stroke-width="1" fill="none" opacity=".35"/>
         </g>
 
-        <!-- Neck -->
-        <rect x="69" y="97" width="22" height="17" rx="6" fill="url(#skinF)"/>
+        <!-- Nose - petite -->
+        <path d="M78 80 L76 93 Q78 97 80 97 Q82 97 84 93 L82 80Z" fill="#c07858" opacity=".28"/>
+        <ellipse cx="80" cy="97" rx="6.5" ry="4" fill="#c07858" opacity=".38"/>
+        <circle cx="75" cy="97" r="2.5" fill="#b06848" opacity=".22"/>
+        <circle cx="85" cy="97" r="2.5" fill="#b06848" opacity=".22"/>
 
-        <g class="avatar-head">
-          <ellipse cx="80" cy="95" rx="32" ry="5" fill="rgba(0,0,0,0.25)"/>
-          <!-- Head -->
-          <ellipse cx="80" cy="58" rx="32" ry="37" fill="url(#skinF)"/>
-          <!-- Long hair back -->
-          <ellipse cx="80" cy="20" rx="33" ry="14" fill="#2a0d04"/>
-          <path d="M48 30 Q40 65 44 100" stroke="#2a0d04" stroke-width="14" fill="none" stroke-linecap="round"/>
-          <path d="M112 30 Q120 65 116 100" stroke="#2a0d04" stroke-width="14" fill="none" stroke-linecap="round"/>
-          <rect x="47" y="18" width="66" height="14" fill="#2a0d04" rx="4"/>
-          <!-- Ear -->
-          <ellipse cx="112" cy="60" rx="5" ry="7" fill="#e0a070"/>
-          <ellipse cx="48" cy="60" rx="5" ry="7" fill="#e0a070"/>
-          <!-- Thin eyebrows -->
-          <path d="M61 42 Q70 37 78 40" stroke="#2a0d04" stroke-width="2" fill="none" stroke-linecap="round"/>
-          <path d="M82 40 Q90 37 99 42" stroke="#2a0d04" stroke-width="2" fill="none" stroke-linecap="round"/>
-          <!-- Eye L with lashes -->
-          <g class="eye-l">
-            <ellipse cx="69" cy="53" rx="8.5" ry="7" fill="white"/>
-            <circle cx="71" cy="53" r="4.5" fill="#3d1a5a"/>
-            <circle cx="71" cy="53" r="2.5" fill="#0d0515"/>
-            <circle cx="73" cy="51" r="1.5" fill="white"/>
-            <path d="M60.5 49 Q65 45 69 47 Q73 45 77.5 49" stroke="#1a0a2a" stroke-width="2" fill="none" stroke-linecap="round"/>
-            <!-- lashes -->
-            <path d="M61 50 L59 47M64 48 L63 45M68 47 L68 44M72 48 L73 45M76 50 L78 47" stroke="#1a0a2a" stroke-width="1.2" stroke-linecap="round"/>
-          </g>
-          <!-- Eye R -->
-          <g class="eye-r">
-            <ellipse cx="91" cy="53" rx="8.5" ry="7" fill="white"/>
-            <circle cx="89" cy="53" r="4.5" fill="#3d1a5a"/>
-            <circle cx="89" cy="53" r="2.5" fill="#0d0515"/>
-            <circle cx="91" cy="51" r="1.5" fill="white"/>
-            <path d="M82.5 49 Q87 45 91 47 Q95 45 99.5 49" stroke="#1a0a2a" stroke-width="2" fill="none" stroke-linecap="round"/>
-            <path d="M83 50 L81 47M86 48 L85 45M90 47 L90 44M94 48 L95 45M98 50 L100 47" stroke="#1a0a2a" stroke-width="1.2" stroke-linecap="round"/>
-          </g>
-          <!-- Nose -->
-          <path d="M80 56 Q77 65 74 68 Q80 70 86 68 Q83 65 80 56Z" fill="#c07060" opacity=".4"/>
-          <!-- Lips -->
-          <path d="M69 79 Q74 75 80 77 Q86 75 91 79 Q86 78 80 79 Q74 78 69 79Z" fill="#d45070"/>
-          <path id="mouthF" d="M69 79 Q80 88 91 79" stroke="#b03055" stroke-width="2" fill="rgba(212,80,112,0.6)" stroke-linecap="round"/>
-          <!-- Cheek blush -->
-          <ellipse cx="58" cy="65" rx="9" ry="6" fill="#ff7090" opacity=".12"/>
-          <ellipse cx="102" cy="65" rx="9" ry="6" fill="#ff7090" opacity=".12"/>
-          <!-- Chin shadow -->
-          <ellipse cx="80" cy="90" rx="18" ry="4" fill="rgba(0,0,0,0.1)"/>
-        </g>
+        <!-- Cupid's bow upper lip -->
+        <path d="M63 109 Q70 104 76 106 Q80 104 84 106 Q90 104 97 109 Q90 106 80 107 Q70 106 63 109Z" fill="#d05870" opacity=".85"/>
+        <!-- Lips / mouth -->
+        <path id="mouthF" d="M65 109 Q80 120 95 109" stroke="#a03050" stroke-width="2.2" fill="rgba(208,80,100,0.5)" stroke-linecap="round"/>
+
+        <!-- Cheek blush -->
+        <ellipse cx="46" cy="90" rx="13" ry="9" fill="rgba(255,100,130,0.1)"/>
+        <ellipse cx="114" cy="90" rx="13" ry="9" fill="rgba(255,100,130,0.1)"/>
+        <!-- Highlight cheekbones -->
+        <ellipse cx="50" cy="86" rx="8" ry="5" fill="rgba(255,255,255,0.05)"/>
+        <ellipse cx="110" cy="86" rx="8" ry="5" fill="rgba(255,255,255,0.05)"/>
+        <!-- Forehead highlight -->
+        <ellipse cx="76" cy="56" rx="12" ry="7" fill="rgba(255,255,255,0.07)"/>
       </g>
     </svg>`;
 
@@ -1570,8 +1650,11 @@ app.get('/dashboard', async (req, res) => {
                     <button class="cpbtn" onclick="setPreset(30,event)">30m</button>
                     <button class="cpbtn" onclick="setPreset(45,event)">45m</button>
                     <button class="cpbtn" onclick="setPreset(60,event)">60m</button>
+                </div>
+                <div class="crono-preset" style="margin-top:0;">
                     <button class="cpbtn" onclick="setPreset(75,event)">75m</button>
                     <button class="cpbtn" onclick="setPreset(90,event)">90m</button>
+                    <button class="cpbtn" onclick="setPreset(120,event)">120m</button>
                 </div>
                 <div class="crono-input-row">
                     <input type="number" id="cronoH" min="0" max="9" value="0" placeholder="HH">
@@ -1657,7 +1740,6 @@ app.get('/dashboard', async (req, res) => {
                     </div>
                     <div class="acc-b ${isToday ? 'open' : ''}" id="dia-${i}">
                         <div class="rutina">${d.contenido}</div>
-                        <button onclick="selectDaySpeak(${i})" class="sec" style="margin-top:10px;padding:8px 14px;width:auto;font-size:.8em;">🔊 Escuchar este día</button>
                     </div>
                 </div>`;
             }).join('')}
@@ -1839,10 +1921,20 @@ app.get('/dashboard', async (req, res) => {
 
     function toggleHablar() {
         if (hablando) { detener(); return; }
-        leer();
+        // Leer el día actualmente abierto
+        const diaAbierto = document.querySelector('[id^="dia-"].open');
+        const idx = diaAbierto ? parseInt(diaAbierto.id.replace('dia-','')) : diaActivo;
+        selectDaySpeak(idx);
     }
 
-    function setTrainerTalking(talking) {
+    function leer() { toggleHablar(); }
+    function detener() {
+        window.speechSynthesis.cancel();
+        clearInterval(mouthInterval);
+        mouthInterval = null;
+        setTrainerTalking(false);
+        animateMouth(false);
+    }
         hablando = talking;
         const btn = document.getElementById('btnHablar');
         const head = document.querySelector('.avatar-head');
@@ -1888,47 +1980,6 @@ app.get('/dashboard', async (req, res) => {
         }, 100);
     }
 
-    function leer() {
-        const s = window.speechSynthesis;
-        s.cancel();
-        const text = document.getElementById('rutina').innerText;
-        if (!text.trim()) return;
-        setTrainerTalking(true);
-        animateMouth(true);
-        document.getElementById('trainerStatus').textContent = '🎙️ Narrando...';
-
-        const frases = text.match(/[^.!?]+[.!?]*/g) || [text];
-        let idx = 0;
-
-        function hablarFrase() {
-            if (idx >= frases.length) {
-                setTrainerTalking(false);
-                animateMouth(false);
-                return;
-            }
-            const u = new SpeechSynthesisUtterance(frases[idx].trim());
-            const sel = document.getElementById('voiceSelect');
-            const esp = voices.filter(v => v.lang.startsWith('es'));
-            u.voice = esp[parseInt(sel?.value)] || selectedVoice;
-            u.lang = 'es-ES';
-            u.rate = modoVoz === 'm' ? 0.92 : 0.95;
-            u.pitch = modoVoz === 'm' ? 0.9 : 1.05;
-            u.volume = 1;
-            u.onstart = () => animateMouth(true);
-            u.onend = () => { idx++; hablarFrase(); };
-            u.onerror = () => { idx++; hablarFrase(); };
-            s.speak(u);
-        }
-        hablarFrase();
-    }
-
-    function detener() {
-        window.speechSynthesis.cancel();
-        clearInterval(mouthInterval);
-        mouthInterval = null;
-        setTrainerTalking(false);
-        animateMouth(false);
-    }
     let voices = [];
     let selectedVoice = null;
     let vocesMasculinas = [];
