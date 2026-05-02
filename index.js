@@ -2649,7 +2649,11 @@ app.post('/admin/eliminar-usuario', async (req, res) => {
     res.redirect('/admin');
 });
 
-// ─── POST /logout ─────────────────────────────────────────────
+// ─── GET + POST /logout ───────────────────────────────────────
+app.get('/logout', (req, res) => {
+    res.setHeader('Set-Cookie', 'uid=; Path=/; Max-Age=0; HttpOnly');
+    res.redirect('/');
+});
 app.post('/logout', (req, res) => {
     res.setHeader('Set-Cookie', 'uid=; Path=/; Max-Age=0; HttpOnly');
     res.redirect('/');
