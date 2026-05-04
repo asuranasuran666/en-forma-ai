@@ -37,7 +37,7 @@ async function llamarGroq(prompt) {
             body: JSON.stringify({
                 model: 'llama-3.3-70b-versatile',
                 messages: [{ role: 'user', content: prompt }],
-                max_tokens: 1500,
+                max_tokens: 2500,
                 temperature: 0.7
             })
         });
@@ -101,12 +101,13 @@ function buildPrompt(u) {
     const imc = calcIMC(u.peso, u.estatura);
     const { label: imcLabel } = infoIMC(imc);
     const sinLesiones = !u.padecimientos || u.padecimientos.trim() === '' || u.padecimientos.toLowerCase().includes('ninguna') || u.padecimientos.toLowerCase().includes('no tengo');
-    return `Eres un médico deportivo y entrenador personal certificado de alto rendimiento. Crea una rutina FITNESS INTENSA y COMPLETA para 5 días.
+    return `Eres un médico deportivo y entrenador personal certificado de alto rendimiento. Crea una rutina FITNESS INTENSA y COMPLETA EXACTAMENTE de 5 días: Lunes, Martes, Miércoles, Jueves y Viernes. NUNCA generes menos de 5 días.
 
 PERFIL DEL ATLETA:
 - Nombre: ${u.nombre} | Sexo: ${u.sexo} | Edad: ${u.edad} años
 - Peso: ${u.peso}kg | Estatura: ${u.estatura}cm | IMC: ${imc} (${imcLabel})
 - Objetivo: ${u.objetivo}
+- Lugar de entrenamiento: ${u.lugar_entrenamiento || 'Gimnasio'}
 - Condición médica / lesiones: ${u.padecimientos || 'NINGUNA — atleta sano, puede trabajar al máximo'}
 
 REGLAS OBLIGATORIAS:
@@ -114,7 +115,8 @@ ${sinLesiones
     ? '- El atleta está SANO. Genera una rutina EXIGENTE con alto volumen de trabajo, series pesadas (4-5 series, 8-12 reps con carga progresiva), ejercicios compuestos, y ritmo intenso. No simplificar.'
     : '- ANALIZA cada lesión/padecimiento con criterio médico y EXCLUYE ejercicios peligrosos. Explica brevemente por qué se evitan.'
 }
-- Plan de 5 días: Lunes, Martes, Miércoles, Jueves, Viernes. Sábado y Domingo descanso activo.
+- Si lugar es "Casa": usa SOLO ejercicios con peso corporal, sin equipamiento (flexiones, sentadillas, fondos, plancha, burpees, etc.). Si es "Gimnasio": usa pesas, máquinas y barra. Si es "Ambos": mezcla ambos.
+- OBLIGATORIO 5 días completos: <h3>Lunes: ...</h3> <h3>Martes: ...</h3> <h3>Miércoles: ...</h3> <h3>Jueves: ...</h3> <h3>Viernes: ...</h3>. Sábado y Domingo descanso activo mencionado al final.
 - Cada día: calentamiento específico (5-8 min), bloque principal con 6-8 ejercicios mínimo, series/reps/descanso exactos, enfriamiento (5 min).
 - Varía los grupos musculares. No repetir los mismos ejercicios dos días seguidos.
 - Usa lenguaje motivador y directo. Tutea al usuario.
@@ -370,6 +372,27 @@ body.zoom-mode { font-size: 20px; }
 
 .imc-bar { background: #222; border-radius: 6px; height: 5px; margin-top: 8px; overflow: hidden; }
 .imc-fill { height: 100%; border-radius: 6px; transition: width .8s ease; }
+
+/* ── TOOLTIP ── */
+.tooltip-wrap { position: relative; display: inline-flex; align-items: center; gap: 4px; cursor: help; }
+.tooltip-wrap .tt {
+    visibility: hidden; opacity: 0;
+    position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+    background: #1a1a2e; border: 1px solid rgba(0,212,255,0.25);
+    color: var(--text); font-size: .72em; line-height: 1.5;
+    padding: 10px 12px; border-radius: 10px;
+    width: 220px; text-align: left;
+    transition: opacity .2s; z-index: 999;
+    font-family: 'Exo 2', sans-serif; font-weight: 400;
+    pointer-events: none;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}
+.tooltip-wrap .tt::after {
+    content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+    border: 6px solid transparent; border-top-color: rgba(0,212,255,0.25);
+}
+.tooltip-wrap:hover .tt,
+.tooltip-wrap:focus .tt { visibility: visible; opacity: 1; }
 
 @media (max-width: 600px) {
     .stats { grid-template-columns: repeat(2, 1fr); }
@@ -1079,6 +1102,13 @@ app.get('/', async (req, res) => {
                     <option value="Mantenerse en FORMA">⚡ Mantenerse en FORMA</option>
                 </select>
 
+                <label>¿Dónde entrenas?</label>
+                <select name="lugar_entrenamiento">
+                    <option value="Gimnasio">🏋️ Gimnasio</option>
+                    <option value="Casa">🏠 Casa (sin equipamiento)</option>
+                    <option value="Ambos">⚡ Gimnasio y Casa</option>
+                </select>
+
                 <label>Lesiones o padecimientos (opcional)</label>
                 <textarea name="padecimientos" placeholder="Ej: hernia discal L4-L5, dolor de rodilla derecha, hipertensión..."></textarea>
 
@@ -1545,6 +1575,12 @@ app.get('/dashboard', async (req, res) => {
                             <option value="Tonificar el CUERPO" ${user.objetivo === 'Tonificar el CUERPO' ? 'selected' : ''}>✨ Tonificar el CUERPO</option>
                             <option value="Mantenerse en FORMA" ${user.objetivo === 'Mantenerse en FORMA' ? 'selected' : ''}>⚡ Mantenerse en FORMA</option>
                         </select>
+                        <label>¿Dónde entrenas?</label>
+                        <select name="lugar_entrenamiento">
+                            <option value="Gimnasio" ${(user.lugar_entrenamiento||'Gimnasio') === 'Gimnasio' ? 'selected' : ''}>🏋️ Gimnasio</option>
+                            <option value="Casa" ${user.lugar_entrenamiento === 'Casa' ? 'selected' : ''}>🏠 Casa (sin equipamiento)</option>
+                            <option value="Ambos" ${user.lugar_entrenamiento === 'Ambos' ? 'selected' : ''}>⚡ Gimnasio y Casa</option>
+                        </select>
                         <label>Lesiones / Padecimientos</label>
                         <textarea name="padecimientos" placeholder="Actualiza tus lesiones...">${user.padecimientos || ''}</textarea>
                         <div class="brow">
@@ -1641,7 +1677,11 @@ app.get('/dashboard', async (req, res) => {
                 ${avatarSVG}
                 <div class="trainer-name">${trainerName}</div>
                 <div class="trainer-status" id="trainerStatus">Listo para entrenar 💪</div>
-                <button class="trainer-speak-btn" id="btnHablar" onclick="toggleHablar()">🔊 Escuchar hoy</button>
+                <div style="display:flex;gap:6px;margin-top:4px;">
+                    <button class="trainer-speak-btn" id="btnHablar" onclick="toggleHablar()" style="flex:1;">🔊 Escuchar</button>
+                    <button class="trainer-speak-btn" id="btnPausarVoz" onclick="pausarVoz()" style="flex:1;display:none;background:var(--accent2);">⏸ Pausar</button>
+                    <button class="trainer-speak-btn" id="btnDetenerVoz" onclick="detener()" style="width:44px;flex:none;background:#333;color:#fff;display:none;">⏹</button>
+                </div>
             </div>
             <!-- CRONÓMETRO -->
             <div class="crono-panel">
@@ -1685,7 +1725,7 @@ app.get('/dashboard', async (req, res) => {
                 <div class="si">🎯</div>
                 <div class="sl">Tu meta</div>
                 <div class="sv" style="color:var(--accent);font-size:1.2em;">${user.objetivo}</div>
-                <div class="ss">${user.sexo}</div>
+                <div class="ss">${user.sexo} · ${user.lugar_entrenamiento || 'Gimnasio'}</div>
             </div>
             <div class="sc">
                 <div class="si">🏅</div>
@@ -1695,7 +1735,21 @@ app.get('/dashboard', async (req, res) => {
             </div>
             <div class="sc">
                 <div class="si">❤️</div>
-                <div class="sl">Índice de salud (IMC)</div>
+                <div class="sl">
+                    <span class="tooltip-wrap">
+                        Índice de salud (IMC) <span style="color:var(--accent);font-size:1.1em;">ⓘ</span>
+                        <span class="tt">
+                            <b style="color:var(--accent);">¿Qué es el IMC?</b><br>
+                            El Índice de Masa Corporal mide la relación entre tu peso y estatura.<br><br>
+                            📊 <b>Fórmula:</b> peso (kg) ÷ estatura (m)²<br><br>
+                            🟡 &lt;18.5 — Bajo peso<br>
+                            🟢 18.5–24.9 — Saludable<br>
+                            🟡 25–29.9 — Sobrepeso<br>
+                            🔴 ≥30 — Obesidad<br><br>
+                            <i style="color:var(--muted);">Es orientativo, no diagnóstico médico.</i>
+                        </span>
+                    </span>
+                </div>
                 <div class="sv" style="color:${imcInfo.color};">${imc}</div>
                 <div class="ss">Estado: ${imcInfo.label}</div>
                 <div class="imc-bar"><div class="imc-fill" style="width:${imcInfo.pct}%;background:${imcInfo.color};"></div></div>
@@ -1735,9 +1789,16 @@ app.get('/dashboard', async (req, res) => {
             ${diasRutina.map((d, i) => {
                 const isToday = i === diaActivo;
                 return `<div class="acc" style="margin-bottom:8px;${isToday ? 'border-color:rgba(0,212,255,0.3);' : ''}">
-                    <div class="acc-h" onclick="selectDay(${i}, this)" style="${isToday ? 'color:var(--accent);' : 'color:var(--muted);'}">
-                        ${isToday ? '📅' : '📋'} ${d.titulo} ${isToday ? '<span style="font-size:.7em;background:rgba(0,212,255,0.15);color:var(--accent);padding:2px 8px;border-radius:10px;margin-left:6px;">HOY</span>' : ''}
-                        <span class="arr">${isToday ? '▲' : '▼'}</span>
+                    <div class="acc-h" style="${isToday ? 'color:var(--accent);' : 'color:var(--muted);'}display:flex;justify-content:space-between;align-items:center;">
+                        <span onclick="selectDay(${i}, this)" style="flex:1;cursor:pointer;">
+                            ${isToday ? '📅' : '📋'} ${d.titulo} ${isToday ? '<span style="font-size:.7em;background:rgba(0,212,255,0.15);color:var(--accent);padding:2px 8px;border-radius:10px;margin-left:6px;">HOY</span>' : ''}
+                        </span>
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <button id="playBtn-${i}" onclick="event.stopPropagation();playDay(${i})"
+                                style="background:none;border:1px solid rgba(0,212,255,0.3);color:var(--accent);width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:.9em;display:flex;align-items:center;justify-content:center;padding:0;flex-shrink:0;transition:.2s;"
+                                title="Escuchar este día">▶</button>
+                            <span onclick="selectDay(${i}, this)" style="cursor:pointer;" class="arr">${isToday ? '▲' : '▼'}</span>
+                        </div>
                     </div>
                     <div class="acc-b ${isToday ? 'open' : ''}" id="dia-${i}">
                         <div class="rutina">${d.contenido}</div>
@@ -1877,6 +1938,24 @@ app.get('/dashboard', async (req, res) => {
     let hablando = false;
     let mouth = null;
 
+    function playDay(idx) {
+        const btn = document.getElementById('playBtn-' + idx);
+        // Si este día ya está sonando -> pausar/reanudar
+        if (diaActivo === idx && hablando) {
+            pausarVoz();
+            if (btn) btn.textContent = vozPausada ? '▶' : '⏸';
+            return;
+        }
+        // Detener lo que esté sonando
+        detener();
+        // Resetear todos los botones
+        document.querySelectorAll('[id^="playBtn-"]').forEach(b => b.textContent = '▶');
+        // Arrancar este día
+        diaActivo = idx;
+        if (btn) btn.textContent = '⏸';
+        selectDaySpeak(idx);
+    }
+
     function selectDay(idx) {
         diaActivo = idx;
         const body = document.getElementById('dia-' + idx);
@@ -1937,23 +2016,53 @@ app.get('/dashboard', async (req, res) => {
         window.speechSynthesis.cancel();
         clearInterval(mouthInterval);
         mouthInterval = null;
+        vozPausada = false;
         setTrainerTalking(false);
         animateMouth(false);
     }
 
     function setTrainerTalking(talking) {
         hablando = talking;
-        const btn = document.getElementById('btnHablar');
+        const btnH = document.getElementById('btnHablar');
+        const btnP = document.getElementById('btnPausarVoz');
+        const btnD = document.getElementById('btnDetenerVoz');
         const head = document.querySelector('.avatar-head');
-        if (btn) {
-            btn.textContent = talking ? '⏹ Detener' : '🔊 Escuchar hoy';
-            btn.classList.toggle('speaking', talking);
-        }
-        if (head) head.classList.toggle('talking', talking);
-        if (!talking) {
+        if (talking) {
+            if (btnH) btnH.style.display = 'none';
+            if (btnP) { btnP.style.display = 'flex'; btnP.textContent = '⏸ Pausar'; }
+            if (btnD) btnD.style.display = 'flex';
+        } else {
+            if (btnH) { btnH.style.display = 'flex'; btnH.textContent = '🔊 Escuchar'; btnH.classList.remove('speaking'); }
+            if (btnP) btnP.style.display = 'none';
+            if (btnD) btnD.style.display = 'none';
             animateMouth(false);
+            document.querySelectorAll('[id^="playBtn-"]').forEach(b => b.textContent = '▶');
             const st = document.getElementById('trainerStatus');
             if (st) st.textContent = '✅ Listo';
+        }
+        if (head) head.classList.toggle('talking', talking);
+    }
+
+    let vozPausada = false;
+    function pausarVoz() {
+        const btnP = document.getElementById('btnPausarVoz');
+        const head = document.querySelector('.avatar-head');
+        if (!vozPausada) {
+            window.speechSynthesis.pause();
+            vozPausada = true;
+            animateMouth(false);
+            if (head) head.classList.remove('talking');
+            if (btnP) btnP.textContent = '▶ Reanudar';
+            const st = document.getElementById('trainerStatus');
+            if (st) st.textContent = '⏸ Pausado';
+        } else {
+            window.speechSynthesis.resume();
+            vozPausada = false;
+            animateMouth(true);
+            if (head) head.classList.add('talking');
+            if (btnP) btnP.textContent = '⏸ Pausar';
+            const st = document.getElementById('trainerStatus');
+            if (st) st.textContent = '🎙️ Narrando...';
         }
     }
 
@@ -2302,7 +2411,7 @@ app.post('/login', async (req, res) => {
 // ─── POST /registrar ──────────────────────────────────────────
 app.post('/registrar', async (req, res) => {
     try {
-        const { nombre, edad, peso, estatura, password, objetivo, sexo, padecimientos } = req.body;
+        const { nombre, edad, peso, estatura, password, objetivo, sexo, padecimientos, lugar_entrenamiento } = req.body;
 
         // Verificar que el usuario no exista
         const { data: existe } = await supabase.from('usuarios').select('id').eq('nombre', nombre).single();
@@ -2311,7 +2420,7 @@ app.post('/registrar', async (req, res) => {
         }
 
         const hashed = await bcrypt.hash(password, 10);
-        const userObj = { nombre, edad: parseInt(edad), peso: parseFloat(peso), estatura: parseInt(estatura), sexo, objetivo, padecimientos, password: hashed };
+        const userObj = { nombre, edad: parseInt(edad), peso: parseFloat(peso), estatura: parseInt(estatura), sexo, objetivo, padecimientos, lugar_entrenamiento: lugar_entrenamiento || 'Gimnasio', password: hashed };
 
         const consejo = await llamarGroq(buildPrompt(userObj));
 
@@ -2375,10 +2484,11 @@ app.post('/actualizar-perfil', async (req, res) => {
     if (!user) return res.redirect('/');
 
     const updates = {
-        peso:        parseFloat(req.body.peso) || user.peso,
-        estatura:    parseInt(req.body.estatura) || user.estatura,
-        objetivo:    req.body.objetivo || user.objetivo,
-        padecimientos: req.body.padecimientos || ''
+        peso:                parseFloat(req.body.peso) || user.peso,
+        estatura:            parseInt(req.body.estatura) || user.estatura,
+        objetivo:            req.body.objetivo || user.objetivo,
+        padecimientos:       req.body.padecimientos || '',
+        lugar_entrenamiento: req.body.lugar_entrenamiento || user.lugar_entrenamiento || 'Gimnasio'
     };
 
     // Si el peso cambió, agregarlo al historial
@@ -2606,8 +2716,11 @@ app.post('/admin/mensaje-global', async (req, res) => {
     if (!user || !user.es_admin) return res.redirect('/dashboard');
     const { contenido } = req.body;
     if (!contenido?.trim()) return res.redirect('/admin');
-    // Obtener todos los usuarios excepto el admin
-    const { data: usuarios, error: errU2 } = await supabase.from('usuarios').select('id').eq('es_admin', false);
+    // Obtener todos los usuarios excepto el admin (es_admin = false o null)
+    const { data: usuarios, error: errU2 } = await supabase
+        .from('usuarios')
+        .select('id')
+        .neq('id', user.id); // excluir solo al admin actual
     if (errU2) console.error('[GLOBAL] Error usuarios:', errU2.message);
     if (usuarios && usuarios.length > 0) {
         const inserts = usuarios.map(u => ({
