@@ -1257,6 +1257,7 @@ app.get('/', async (req, res) => {
 app.get('/dashboard', async (req, res) => {
     const user = await getUser(req);
     if (!user) return res.redirect('/');
+    const errQuery = req.query.err || '';
 
     const { data: notas } = await supabase
         .from('notas')
