@@ -2,6 +2,21 @@ require('dotenv').config();
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const bcrypt = require('bcrypt');
+const rateLimit = require('express-rate-limit');
+
+const limiteRutina = rateLimit({
+    windowMs: 7 * 24 * 60 * 60 * 1000,
+    max: 2,
+    keyGenerator: (req) => req.cookies?.['uid'] || req.ip,
+    handler: (req, res) => res.redirect('/dashboard?err=limite_rutina')
+});
+
+const limiteDieta = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: 2,
+    keyGenerator: (req) => req.cookies?.['uid'] || req.ip,
+    handler: (req, res) => res.redirect('/dashboard?err=limite_dieta')
+});
 
 const app = express();
 const PORT = process.env.PORT || 10000;
@@ -59,6 +74,17 @@ async function llamarGroq(prompt) {
 function buildPromptDieta(u) {
     const imc = calcIMC(u.peso, u.estatura);
     const { label: imcLabel } = infoIMC(imc);
+
+    const paisLinea = u.pais
+        ? `- País/Región: ${u.pais} (usa alimentos típicos y accesibles de esa zona, respeta la cultura alimentaria local)`
+        : '';
+    const presupuestoLinea = u.nivel_economico
+        ? `- Presupuesto: ${u.nivel_economico === 'Bajo' ? 'Ajustado — usa alimentos económicos, evita superfoods caros o importados' : u.nivel_economico === 'Alto' ? 'Sin restricción — puede incluir alimentos premium, superfoods y suplementos' : 'Moderado — balance entre precio y calidad, alimentos comunes de supermercado'}`
+        : '';
+    const restriccionLinea = u.restricciones_dieta
+        ? `- Restricción alimentaria OBLIGATORIA: ${u.restricciones_dieta} — NO incluyas ningún alimento que incumpla esta restricción`
+        : '';
+
     return `Eres un nutricionista deportivo y médico. Basándote en el perfil del paciente, crea:
 
 1. UN PLAN DE DIETA REALISTA y específico para su objetivo
@@ -69,10 +95,14 @@ PERFIL:
 - Peso: ${u.peso}kg | Estatura: ${u.estatura}cm | IMC: ${imc} (${imcLabel})
 - Objetivo: ${u.objetivo}
 - Lesiones/Padecimientos: ${u.padecimientos || 'Ninguno'}
+${paisLinea}
+${presupuestoLinea}
+${restriccionLinea}
 
 INSTRUCCIONES:
 - La dieta debe ser práctica, con alimentos accesibles y porciones claras
 - Incluye desayuno, almuerzo, merienda y cena de ejemplo
+- Adapta los alimentos al país y cultura del usuario si se especifica
 - Para las lesiones: explica qué alimentos o suplementos pueden ayudar a la recuperación, y qué evitar
 - SIEMPRE añade al final: "⚕️ Consulta a tu médico o especialista antes de hacer cambios en tu alimentación o tratamiento."
 - Responde ÚNICAMENTE en HTML limpio. Solo estas etiquetas: <b>, <br>, <ul>, <li>, <h3>, <p>. Sin estilos inline.`;
@@ -377,19 +407,19 @@ body.zoom-mode { font-size: 20px; }
 .tooltip-wrap { position: relative; display: inline-flex; align-items: center; gap: 4px; cursor: help; }
 .tooltip-wrap .tt {
     visibility: hidden; opacity: 0;
-    position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+    position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%);
     background: #1a1a2e; border: 1px solid rgba(0,212,255,0.25);
-    color: var(--text); font-size: .72em; line-height: 1.5;
-    padding: 10px 12px; border-radius: 10px;
-    width: 220px; text-align: left;
+    color: var(--text); font-size: 0.9em; line-height: 1.6;
+    padding: 12px 14px; border-radius: 10px;
+    width: 240px; text-align: left;
     transition: opacity .2s; z-index: 999;
     font-family: 'Exo 2', sans-serif; font-weight: 400;
     pointer-events: none;
     box-shadow: 0 4px 20px rgba(0,0,0,0.5);
 }
 .tooltip-wrap .tt::after {
-    content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
-    border: 6px solid transparent; border-top-color: rgba(0,212,255,0.25);
+    content: ''; position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
+    border: 6px solid transparent; border-bottom-color: rgba(0,212,255,0.25);
 }
 .tooltip-wrap:hover .tt,
 .tooltip-wrap:focus .tt { visibility: visible; opacity: 1; }
@@ -738,23 +768,88 @@ button.orange:hover { box-shadow: 0 4px 15px rgba(255,102,0,0.3); }
 
 @media (max-width: 768px) {
     .main-layout { flex-direction: column; padding: 0 10px; }
-    .main-content { padding: 16px 0 120px; }
-    .side-panel {
+    .main-content { padding: 16px 0 40px; }
+    .side-panel { display: none; }
+}
+
+/* Modal cronómetro móvil */
+.crono-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    z-index: 998;
+    align-items: flex-end;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+}
+.crono-modal.open { display: flex; }
+.crono-modal-inner {
+    background: var(--card);
+    border: 1px solid rgba(0,212,255,0.2);
+    border-radius: 20px 20px 0 0;
+    padding: 20px 24px 32px;
+    width: 100%;
+    max-width: 480px;
+}
+.crono-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+.crono-modal-title {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 1em;
+    color: var(--accent);
+    letter-spacing: 3px;
+    font-weight: 700;
+}
+
+/* Avatar saludo móvil */
+.avatar-greeting {
+    display: none;
+}
+@media (max-width: 768px) {
+    .avatar-greeting {
+        display: flex;
         position: fixed;
         bottom: 0; left: 0; right: 0;
-        width: 100%;
-        height: auto;
-        top: auto;
-        flex-direction: row;
         background: rgba(9,9,16,0.97);
-        border-top: 1px solid rgba(0,212,255,0.15);
-        padding: 8px 12px;
-        z-index: 200;
-        backdrop-filter: blur(10px);
-        gap: 8px;
+        border-top: 1px solid rgba(0,212,255,0.2);
+        padding: 10px 16px;
+        z-index: 300;
         align-items: center;
-        overflow-x: auto;
-        overflow-y: hidden;
+        gap: 12px;
+        transition: transform .4s ease;
+    }
+    .avatar-greeting.hidden {
+        transform: translateY(100%);
+    }
+    .avatar-greeting svg { width: 54px; height: 54px; flex-shrink: 0; }
+    .avatar-greeting-text {
+        flex: 1;
+        font-size: .82em;
+        color: var(--text);
+        line-height: 1.4;
+    }
+    .avatar-greeting-name {
+        font-family: 'Rajdhani', sans-serif;
+        font-size: .78em;
+        color: var(--accent);
+        font-weight: 700;
+        letter-spacing: 1px;
+        margin-bottom: 2px;
+    }
+    .avatar-greeting-close {
+        background: none;
+        border: none;
+        color: var(--muted);
+        font-size: 1.2em;
+        cursor: pointer;
+        padding: 4px;
+        width: auto;
+        flex-shrink: 0;
     }
 }
 
@@ -1029,7 +1124,8 @@ app.get('/test-ia', async (req, res) => {
 // ─── GET / ─────────────────────────────────────────────────────
 app.get('/', async (req, res) => {
     const user = await getUser(req);
-    if (user) return res.redirect('/dashboard');
+if (!user) return res.redirect('/');
+const errQuery = req.query.err || '';
 
     const err = req.query.err === '1' ? `<div class="err">Usuario o contraseña incorrectos.</div>` : '';
     const regErr = req.query.regerr ? `<div class="err">${decodeURIComponent(req.query.regerr)}</div>` : '';
@@ -1602,20 +1698,51 @@ app.get('/dashboard', async (req, res) => {
             </div>
 
             <!-- DIETA -->
-            <div class="sb-section">
-                <div class="sb-section-h" onclick="toggleSb('sb-dieta')">
-                    🥗 DIETA Y RECOMENDACIONES <span>▼</span>
-                </div>
-                <div class="sb-section-b" id="sb-dieta">
-                    ${user.dieta_ia
-                        ? `<div style="font-size:.85em;line-height:1.6;max-height:400px;overflow-y:auto;">${user.dieta_ia}</div><div class="div"></div>`
-                        : `<p style="color:var(--muted);font-size:.82em;margin-bottom:10px;">Aún no tienes un plan de dieta. Genera uno con IA basado en tu perfil y objetivo.</p>`
-                    }
-                    <form action="/regenerar-dieta" method="POST" onsubmit="showSpin('GENERANDO PLAN DE DIETA CON IA...')">
-                        <button type="submit" class="orange" style="font-size:.82em;">🤖 ${user.dieta_ia ? 'Regenerar dieta' : 'Generar dieta con IA'}</button>
-                    </form>
-                </div>
-            </div>
+<div class="sb-section">
+    <div class="sb-section-h" onclick="toggleSb('sb-dieta')">
+        🥗 DIETA Y RECOMENDACIONES <span>▼</span>
+    </div>
+    <div class="sb-section-b" id="sb-dieta">
+        ${user.dieta_ia
+            ? `<div style="font-size:.85em;line-height:1.6;max-height:400px;overflow-y:auto;">${user.dieta_ia}</div><div class="div"></div>`
+            : `<p style="color:var(--muted);font-size:.82em;margin-bottom:10px;">Aún no tienes un plan de dieta. Genera uno con IA basado en tu perfil y objetivo.</p>`
+        }
+
+        <!-- PREFERENCIAS DE DIETA -->
+        <div style="background:rgba(0,212,255,0.04);border:1px solid rgba(0,212,255,0.1);border-radius:10px;padding:12px;margin-bottom:10px;">
+            <div style="font-size:.72em;color:var(--accent);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px;font-weight:700;">⚙️ Preferencias (opcional)</div>
+            <form action="/guardar-preferencias-dieta" method="POST" onsubmit="showSpin('GUARDANDO PREFERENCIAS...')">
+                <label style="font-size:.78em;">País / Región</label>
+                <input name="pais" placeholder="Ej: España, México, Colombia..." value="${user.pais || ''}" style="font-size:.85em;margin-bottom:8px;">
+
+                <label style="font-size:.78em;">Presupuesto para comida</label>
+                <select name="nivel_economico" style="font-size:.85em;margin-bottom:8px;">
+                    <option value="">— No especificar —</option>
+                    <option value="Bajo" ${user.nivel_economico === 'Bajo' ? 'selected' : ''}>💰 Ajustado (económico)</option>
+                    <option value="Medio" ${user.nivel_economico === 'Medio' ? 'selected' : ''}>💰💰 Moderado</option>
+                    <option value="Alto" ${user.nivel_economico === 'Alto' ? 'selected' : ''}>💰💰💰 Sin restricción</option>
+                </select>
+
+                <label style="font-size:.78em;">Restricciones alimentarias</label>
+                <select name="restricciones_dieta" style="font-size:.85em;margin-bottom:10px;">
+                    <option value="">— Ninguna —</option>
+                    <option value="Vegetariano" ${user.restricciones_dieta === 'Vegetariano' ? 'selected' : ''}>🥦 Vegetariano</option>
+                    <option value="Vegano" ${user.restricciones_dieta === 'Vegano' ? 'selected' : ''}>🌱 Vegano</option>
+                    <option value="Sin gluten" ${user.restricciones_dieta === 'Sin gluten' ? 'selected' : ''}>🌾 Sin gluten</option>
+                    <option value="Sin lactosa" ${user.restricciones_dieta === 'Sin lactosa' ? 'selected' : ''}>🥛 Sin lactosa</option>
+                    <option value="Halal" ${user.restricciones_dieta === 'Halal' ? 'selected' : ''}>☪️ Halal</option>
+                    <option value="Kosher" ${user.restricciones_dieta === 'Kosher' ? 'selected' : ''}>✡️ Kosher</option>
+                </select>
+
+                <button type="submit" class="sec" style="font-size:.78em;width:100%;">💾 Guardar preferencias</button>
+            </form>
+        </div>
+
+        <form action="/regenerar-dieta" method="POST" onsubmit="showSpin('GENERANDO PLAN DE DIETA CON IA...')">
+            <button type="submit" class="orange" style="font-size:.82em;">🤖 ${user.dieta_ia ? 'Regenerar dieta' : 'Generar dieta con IA'}</button>
+        </form>
+    </div>
+</div>
 
             <!-- CERRAR SESIÓN -->
             <form action="/logout" method="POST" style="margin-top:8px;">
@@ -1633,10 +1760,16 @@ app.get('/dashboard', async (req, res) => {
         </div>
         <div class="topbar-brand">EN-FORMA AI</div>
         <div class="topbar-actions">
-            <button class="msg-btn" onclick="abrirMensajes()" title="Mensajes y soporte">
-                💬
-                ${noLeidos > 0 ? `<span class="msg-badge">${noLeidos}</span>` : ''}
-            </button>
+    <button class="msg-btn" id="btnCronoTopbar" onclick="abrirCronoModal()" title="Cronómetro" style="display:none;">
+        ⏱
+    </button>
+    <button class="msg-btn" id="btnAvatarTopbar" onclick="abrirAvatarGreeting()" title="Entrenador" style="display:none;">
+        🤖
+    </button>
+    <button class="msg-btn" onclick="abrirMensajes()" title="Mensajes y soporte">
+        💬
+        ${noLeidos > 0 ? `<span class="msg-badge">${noLeidos}</span>` : ''}
+    </button>
             ${user.es_admin ? `<a href="/admin" style="text-decoration:none;"><button class="tbtn" style="background:rgba(255,204,0,0.1);color:#ffcc00;border-color:rgba(255,204,0,0.3);">👑 ADMIN</button></a>` : ''}
             <form action="/logout" method="POST" style="display:inline;">
                 <button type="submit" class="tbtn red">CERRAR SESIÓN</button>
@@ -1729,7 +1862,20 @@ app.get('/dashboard', async (req, res) => {
             </div>
             <div class="sc">
                 <div class="si">🏅</div>
-                <div class="sl">Tu rango</div>
+                <div class="sl">
+                    <span class="tooltip-wrap">
+                        Tu rango <span style="color:var(--accent);font-size:1.1em;">ⓘ</span>
+                        <span class="tt">
+                            <b style="color:var(--accent);">¿Cómo se calcula tu rango?</b><br>
+                            Sube automáticamente según las entradas que escribas en tu diario de entrenamiento.<br><br>
+                            🔥 <b>Novato</b> — 0 a 4 entradas<br>
+                            ⚡ <b>Intermedio</b> — 5 a 14 entradas<br>
+                            🏋️ <b>Avanzado</b> — 15 a 29 entradas<br>
+                            🏆 <b>Élite</b> — 30 o más entradas<br><br>
+                            <i style="color:var(--muted);">Tú tienes ${notasArr.length} entrada${notasArr.length !== 1 ? 's' : ''} en tu diario.</i>
+                        </span>
+                    </span>
+                </div>
                 <div class="sv" style="color:${rangoInfo.color};">${rangoInfo.label}</div>
                 <div class="ricons">${rangoInfo.icons}</div>
             </div>
@@ -1782,6 +1928,8 @@ app.get('/dashboard', async (req, res) => {
         <div class="card hl">
             <div class="card-t" style="flex-wrap:wrap;gap:8px;">
                 <span>🤖 TU PLAN SEMANAL</span>
+<span style="font-size:.7em;color:var(--muted);font-weight:400;">· 2 regeneraciones por semana</span>
+${errQuery === 'limite_rutina' ? `<span style="font-size:.75em;color:#ff4444;font-weight:700;">⚠️ Límite semanal alcanzado</span>` : ''}
                 <form action="/regenerar" method="POST" style="display:inline;" onsubmit="showSpin('GENERANDO NUEVA RUTINA CON IA...')">
                     <button type="submit" class="orange" style="width:auto;padding:7px 14px;font-size:.75em;">🔄 Regenerar</button>
                 </form>
@@ -1819,7 +1967,50 @@ app.get('/dashboard', async (req, res) => {
 
         </div><!-- /main-content -->
     </div><!-- /main-layout -->
+<!-- MODAL CRONÓMETRO MÓVIL -->
+<div class="crono-modal" id="cronoModal" onclick="if(event.target===this)cerrarCronoModal()">
+    <div class="crono-modal-inner">
+        <div class="crono-modal-header">
+            <div class="crono-modal-title">⏱ CRONÓMETRO</div>
+            <button class="avatar-greeting-close" onclick="cerrarCronoModal()">✕</button>
+        </div>
+        <div class="crono-panel" style="border:none;padding:0;background:none;backdrop-filter:none;">
+            <div class="crono-display" id="cronoDisplay2">00:00:00</div>
+            <div class="crono-preset">
+                <button class="cpbtn" onclick="setPreset2(30)">30m</button>
+                <button class="cpbtn" onclick="setPreset2(45)">45m</button>
+                <button class="cpbtn" onclick="setPreset2(60)">60m</button>
+                <button class="cpbtn" onclick="setPreset2(75)">75m</button>
+                <button class="cpbtn" onclick="setPreset2(90)">90m</button>
+                <button class="cpbtn" onclick="setPreset2(120)">120m</button>
+            </div>
+            <div class="crono-input-row">
+                <input type="number" id="cronoH2" min="0" max="9" value="0" placeholder="HH">
+                <span>:</span>
+                <input type="number" id="cronoM2" min="0" max="59" value="${minutosSugeridos}" placeholder="MM">
+                <span>:</span>
+                <input type="number" id="cronoS2" min="0" max="59" value="0" placeholder="SS">
+            </div>
+            <div class="crono-btns">
+                <button onclick="cronoStart2()" class="orange" id="btnStart2">▶</button>
+                <button onclick="cronoPause2()" class="sec" id="btnPause2" style="display:none;">⏸</button>
+                <button onclick="cronoReset2()" class="sec">↺</button>
+            </div>
+        </div>
+    </div>
+</div>
 
+<!-- AVATAR SALUDO MÓVIL -->
+<div class="avatar-greeting" id="avatarGreeting">
+    <div style="width:54px;height:54px;flex-shrink:0;">
+        ${avatarSVG}
+    </div>
+    <div class="avatar-greeting-text">
+        <div class="avatar-greeting-name">${trainerName}</div>
+        <div id="avatarGreetingMsg">¡Hola ${user.nombre}! Listo para entrenar 💪</div>
+    </div>
+    <button class="avatar-greeting-close" onclick="cerrarAvatarGreeting()">✕</button>
+</div>
     <!-- SPINNER -->
     <div class="spin-overlay" id="spinner">
         <div class="spin"></div>
@@ -1994,10 +2185,10 @@ app.get('/dashboard', async (req, res) => {
             const esp = voices.filter(v => v.lang.startsWith('es'));
             u.voice = esp[parseInt(sel?.value)] || selectedVoice;
             u.lang = 'es-ES';
-            u.rate = modoVoz === 'm' ? 0.92 : 0.95;
-            u.pitch = modoVoz === 'm' ? 0.9 : 1.05;
-            u.onend = () => { fidx++; hablar(); };
-            u.onerror = () => { fidx++; hablar(); };
+            u.rate = modoVoz === 'm' ? 0.88 : 0.95;
+            u.pitch = modoVoz === 'm' ? 0.6 : 1.05;
+            u.onend  = () => { fidx++; if (hablando) hablar(); };
+u.onerror = () => { fidx++; if (hablando) hablar(); };
             window.speechSynthesis.speak(u);
         }
         hablar();
@@ -2076,7 +2267,7 @@ app.get('/dashboard', async (req, res) => {
         mouthInterval = null;
         if (!active) {
             const isFem = !!document.getElementById('mouthF');
-            el.setAttribute('d', isFem ? 'M69 79 Q80 88 91 79' : 'M68 82 Q80 90 92 82');
+            el.setAttribute('d', isFem ? 'M69 108 Q80 114 91 108' : 'M68 108 Q80 115 92 108');
             return;
         }
         const isFem = !!document.getElementById('mouthF');
@@ -2314,7 +2505,77 @@ app.get('/dashboard', async (req, res) => {
     }
 
     actualizarDisplay(sugerido * 60);
+// ── MÓVIL: mostrar iconos en topbar ───────────────────────────
+if (window.innerWidth <= 768) {
+    document.getElementById('btnCronoTopbar').style.display = 'flex';
+    document.getElementById('btnAvatarTopbar').style.display = 'flex';
+    // Saludo automático al entrar
+    setTimeout(() => cerrarAvatarGreeting(), 5000);
+}
 
+// ── MODAL CRONÓMETRO MÓVIL ─────────────────────────────────────
+function abrirCronoModal() { document.getElementById('cronoModal').classList.add('open'); }
+function cerrarCronoModal() { document.getElementById('cronoModal').classList.remove('open'); }
+
+let cronoTimer2 = null, cronoSecs2 = 0, cronoPaused2 = false;
+
+function actualizarDisplay2(s) {
+    const h = String(Math.floor(s/3600)).padStart(2,'0');
+    const m = String(Math.floor((s%3600)/60)).padStart(2,'0');
+    const sc = String(s%60).padStart(2,'0');
+    document.getElementById('cronoDisplay2').textContent = h+':'+m+':'+sc;
+}
+
+function setPreset2(m) {
+    clearInterval(cronoTimer2); cronoTimer2 = null; cronoPaused2 = false;
+    document.getElementById('cronoM2').value = m;
+    document.getElementById('cronoH2').value = 0;
+    document.getElementById('cronoS2').value = 0;
+    cronoSecs2 = m * 60;
+    actualizarDisplay2(cronoSecs2);
+    document.getElementById('btnStart2').style.display = 'inline-block';
+    document.getElementById('btnPause2').style.display = 'none';
+}
+
+function cronoStart2() {
+    if (cronoTimer2) return;
+    if (!cronoPaused2) {
+        const h = parseInt(document.getElementById('cronoH2').value)||0;
+        const m = parseInt(document.getElementById('cronoM2').value)||0;
+        const s = parseInt(document.getElementById('cronoS2').value)||0;
+        cronoSecs2 = h*3600 + m*60 + s;
+    }
+    cronoPaused2 = false;
+    document.getElementById('btnStart2').style.display = 'none';
+    document.getElementById('btnPause2').style.display = 'inline-block';
+    cronoTimer2 = setInterval(() => {
+        cronoSecs2--;
+        actualizarDisplay2(cronoSecs2);
+        if (cronoSecs2 <= 0) { clearInterval(cronoTimer2); cronoTimer2 = null; }
+    }, 1000);
+}
+
+function cronoPause2() {
+    clearInterval(cronoTimer2); cronoTimer2 = null; cronoPaused2 = true;
+    document.getElementById('btnStart2').style.display = 'inline-block';
+    document.getElementById('btnPause2').style.display = 'none';
+}
+
+function cronoReset2() {
+    clearInterval(cronoTimer2); cronoTimer2 = null; cronoPaused2 = false;
+    cronoSecs2 = 0; actualizarDisplay2(0);
+    document.getElementById('btnStart2').style.display = 'inline-block';
+    document.getElementById('btnPause2').style.display = 'none';
+}
+
+// ── AVATAR SALUDO MÓVIL ────────────────────────────────────────
+function cerrarAvatarGreeting() {
+    document.getElementById('avatarGreeting').classList.add('hidden');
+}
+function abrirAvatarGreeting() {
+    document.getElementById('avatarGreeting').classList.remove('hidden');
+    setTimeout(() => cerrarAvatarGreeting(), 6000);
+}
     // ── GRÁFICA DE PESO ────────────────────────────────────────
     const histData = JSON.parse(document.getElementById('_histData').textContent);
     let chartInstance = null;
@@ -2389,8 +2650,8 @@ async function generarDieta(req, res) {
     }
     res.redirect('/dashboard');
 }
-app.get('/regenerar-dieta', generarDieta);
-app.post('/regenerar-dieta', generarDieta);
+app.get('/regenerar-dieta', limiteDieta, generarDieta);
+app.post('/regenerar-dieta', limiteDieta, generarDieta);
 
 // ─── POST /login ──────────────────────────────────────────────
 app.post('/login', async (req, res) => {
@@ -2441,7 +2702,7 @@ app.post('/registrar', async (req, res) => {
 });
 
 // ─── GET /regenerar ───────────────────────────────────────────
-app.get('/regenerar', async (req, res) => {
+app.get('/regenerar', limiteRutina, async (req, res) => {
     const user = await getUser(req);
     if (!user) return res.redirect('/');
     const consejo = await llamarGroq(buildPrompt(user));
@@ -2452,7 +2713,7 @@ app.get('/regenerar', async (req, res) => {
 });
 
 // ─── POST /regenerar ──────────────────────────────────────────
-app.post('/regenerar', async (req, res) => {
+app.post('/regenerar', limiteRutina, async (req, res) => {
     const user = await getUser(req);
     if (!user) return res.redirect('/');
     const consejo = await llamarGroq(buildPrompt(user));
@@ -2509,6 +2770,17 @@ app.post('/actualizar-perfil', async (req, res) => {
     res.redirect('/dashboard');
 });
 
+// ─── POST /guardar-preferencias-dieta ────────────────────────
+app.post('/guardar-preferencias-dieta', async (req, res) => {
+    const user = await getUser(req);
+    if (!user) return res.redirect('/');
+    const updates = {};
+    if (req.body.pais !== undefined)               updates.pais = req.body.pais || null;
+    if (req.body.nivel_economico !== undefined)    updates.nivel_economico = req.body.nivel_economico || null;
+    if (req.body.restricciones_dieta !== undefined) updates.restricciones_dieta = req.body.restricciones_dieta || null;
+    await supabase.from('usuarios').update(updates).eq('id', user.id);
+    res.redirect('/dashboard');
+});
 // ─── POST /guardar-nota ───────────────────────────────────────
 app.post('/guardar-nota', async (req, res) => {
     const user = await getUser(req);
