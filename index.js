@@ -1124,8 +1124,8 @@ app.get('/test-ia', async (req, res) => {
 // ─── GET / ─────────────────────────────────────────────────────
 app.get('/', async (req, res) => {
     const user = await getUser(req);
-if (!user) return res.redirect('/');
-const errQuery = req.query.err || '';
+    if (user) return res.redirect('/dashboard');
+    const errQuery = req.query.err || '';
 
     const err = req.query.err === '1' ? `<div class="err">Usuario o contraseña incorrectos.</div>` : '';
     const regErr = req.query.regerr ? `<div class="err">${decodeURIComponent(req.query.regerr)}</div>` : '';
