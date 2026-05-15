@@ -2,7 +2,25 @@ require('dotenv').config();
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
+
+const COOKIE_SECRET = process.env.COOKIE_SECRET || 'enforma-secret-2025';
+
+function firmarUID(uid) {
+    const firma = crypto.createHmac('sha256', COOKIE_SECRET).update(uid).digest('hex');
+    return `${uid}.${firma}`;
+}
+
+function verificarUID(valor) {
+    if (!valor || !valor.includes('.')) return null;
+    const lastDot = valor.lastIndexOf('.');
+    const uid = valor.substring(0, lastDot);
+    const firma = valor.substring(lastDot + 1);
+    const firmaEsperada = crypto.createHmac('sha256', COOKIE_SECRET).update(uid).digest('hex');
+    if (firma !== firmaEsperada) return null;
+    return uid;
+}
 
 const limiteRutina = rateLimit({
     windowMs: 7 * 24 * 60 * 60 * 1000,
@@ -10,18 +28,15 @@ const limiteRutina = rateLimit({
     keyGenerator: (req) => req.cookies?.['uid'] || req.ip,
     handler: (req, res) => res.redirect('/dashboard?err=limite_rutina')
 });
-
 const limiteDieta = rateLimit({
     windowMs: 60 * 60 * 1000,
     max: 2,
     keyGenerator: (req) => req.cookies?.['uid'] || req.ip,
     handler: (req, res) => res.redirect('/dashboard?err=limite_dieta')
 });
-
 const app = express();
 const PORT = process.env.PORT || 10000;
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
-
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
@@ -156,7 +171,9 @@ ${sinLesiones
 
 async function getUser(req) {
     try {
-        const uid = req.cookies['uid'];
+        const valor = req.cookies['uid'];
+        if (!valor) return null;
+        const uid = verificarUID(valor);
         if (!uid) return null;
         const { data } = await supabase.from('usuarios').select('*').eq('id', uid).single();
         return data || null;
@@ -2659,7 +2676,7 @@ app.post('/login', async (req, res) => {
         const { nombre, password } = req.body;
         const { data: u } = await supabase.from('usuarios').select('*').eq('nombre', nombre).single();
         if (u && await bcrypt.compare(password, u.password)) {
-            res.setHeader('Set-Cookie', `uid=${u.id}; Path=/; HttpOnly; Max-Age=604800`);
+            res.setHeader('Set-Cookie', `uid=${firmarUID(u.id)}; Path=/; HttpOnly; Max-Age=604800`);
             return res.redirect('/dashboard');
         }
         res.redirect('/?err=1');
@@ -2693,7 +2710,7 @@ app.post('/registrar', async (req, res) => {
 
         if (error) throw error;
 
-        res.setHeader('Set-Cookie', `uid=${data[0].id}; Path=/; HttpOnly; Max-Age=604800`);
+        res.setHeader('Set-Cookie', `uid=${firmarUID(data[0].id)}; Path=/; HttpOnly; Max-Age=604800`);
         res.redirect('/dashboard');
     } catch (e) {
         console.error('Registro error:', e);
@@ -2824,8 +2841,10 @@ app.get('/admin', async (req, res) => {
     if (!user || !user.es_admin) return res.redirect('/dashboard');
 
     // PIN check
-    const ADMIN_PIN = process.env.ADMIN_PIN || '1234';
-    if (req.cookies['admin_pin'] !== ADMIN_PIN) {
+    const adminToken = req.cookies['admin_token'] || '';
+    const [tokenVal, tokenFirma] = adminToken.split('.');
+    const firmaEsperada = tokenVal ? crypto.createHmac('sha256', COOKIE_SECRET).update(tokenVal).digest('hex') : '';
+    if (!tokenVal || tokenFirma !== firmaEsperada) {
         return res.send(page(`
         <div class="lp">
             <div class="lc" style="max-width:320px;">
@@ -2961,7 +2980,9 @@ app.get('/admin', async (req, res) => {
 app.post('/admin/pin', async (req, res) => {
     const ADMIN_PIN = process.env.ADMIN_PIN || '1234';
     if (req.body.pin === ADMIN_PIN) {
-        res.setHeader('Set-Cookie', `admin_pin=${ADMIN_PIN}; Path=/; HttpOnly; Max-Age=28800`);
+        const token = crypto.randomBytes(32).toString('hex');
+        const firma = crypto.createHmac('sha256', COOKIE_SECRET).update(token).digest('hex');
+        res.setHeader('Set-Cookie', `admin_token=${token}.${firma}; Path=/; HttpOnly; Max-Age=28800`);
         return res.redirect('/admin');
     }
     res.redirect('/admin?err=1');
