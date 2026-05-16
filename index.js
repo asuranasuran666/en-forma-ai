@@ -13,13 +13,19 @@ function firmarUID(uid) {
 }
 
 function verificarUID(valor) {
-    if (!valor || !valor.includes('.')) return null;
-    const lastDot = valor.lastIndexOf('.');
-    const uid = valor.substring(0, lastDot);
-    const firma = valor.substring(lastDot + 1);
-    const firmaEsperada = crypto.createHmac('sha256', COOKIE_SECRET).update(uid).digest('hex');
-    if (firma !== firmaEsperada) return null;
-    return uid;
+    if (!valor) return null;
+    // Cookie nueva con firma
+    if (valor.includes('.')) {
+        const lastDot = valor.lastIndexOf('.');
+        const uid = valor.substring(0, lastDot);
+        const firma = valor.substring(lastDot + 1);
+        const firmaEsperada = crypto.createHmac('sha256', COOKIE_SECRET).update(uid).digest('hex');
+        if (firma === firmaEsperada) return uid;
+    }
+    // Cookie antigua (UUID sin firma) — aceptar durante transición
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (uuidRegex.test(valor)) return valor;
+    return null;
 }
 
 const limiteRutina = rateLimit({
