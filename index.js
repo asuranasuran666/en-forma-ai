@@ -349,6 +349,8 @@ body.zoom-mode { font-size: 20px; }
 .sb-section-h:hover { background: rgba(0,212,255,0.07); }
 .sb-section-b { padding: 14px; display: none; }
 .sb-section-b.open { display: block; }
+#sb-pref-dieta { display: none; }
+#sb-pref-dieta.open { display: block; }
 
 .overlay {
     display: none;
@@ -432,7 +434,7 @@ body.zoom-mode { font-size: 20px; }
     visibility: hidden; opacity: 0;
     position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%);
     background: #1a1a2e; border: 1px solid rgba(0,212,255,0.25);
-    color: var(--text); font-size: 0.9em; line-height: 1.6;
+    color: var(--text); font-size: 1.125em; line-height: 1.6;
     padding: 12px 14px; border-radius: 10px;
     width: 240px; text-align: left;
     transition: opacity .2s; z-index: 999;
@@ -1397,8 +1399,8 @@ app.get('/dashboard', async (req, res) => {
     const diaActivo = Math.min(diaHoy === 0 ? 6 : diaHoy - 1, diasRutina.length - 1);
 
     const esFemenino = user.sexo === 'Femenino';
-    const trainerName = esFemenino ? 'Entrenadora Sofia' : 'Entrenador Marco';
-    const minutosSugeridos = {'Perder PESO':45,'Ganar MÚSCULO':60,'Mejorar RESISTENCIA':75,'Tonificar el CUERPO':50,'Mantenerse en FORMA':45}[user.objetivo] || 45;
+const trainerName = esFemenino ? 'Entrenadora Sofia' : 'Entrenador Marco';
+const minutosSugeridos = {'Perder PESO':60,'Ganar MÚSCULO':60,'Mejorar RESISTENCIA':75,'Tonificar el CUERPO':60,'Mantenerse en FORMA':60}[user.objetivo] || 60;
 
     const avatarMasc = `<svg viewBox="0 0 160 180" xmlns="http://www.w3.org/2000/svg">
       <defs>
@@ -1727,54 +1729,54 @@ app.get('/dashboard', async (req, res) => {
         🥗 DIETA Y RECOMENDACIONES <span>▼</span>
     </div>
     <div class="sb-section-b" id="sb-dieta">
-        ${user.dieta_ia
-            ? `<div style="font-size:.85em;line-height:1.6;max-height:400px;overflow-y:auto;">${user.dieta_ia}</div><div class="div"></div>`
-            : `<p style="color:var(--muted);font-size:.82em;margin-bottom:10px;">Aún no tienes un plan de dieta. Genera uno con IA basado en tu perfil y objetivo.</p>`
-        }
 
-        <!-- PREFERENCIAS DE DIETA -->
-        <div style="background:rgba(0,212,255,0.04);border:1px solid rgba(0,212,255,0.1);border-radius:10px;padding:12px;margin-bottom:10px;">
-            <div style="font-size:.72em;color:var(--accent);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px;font-weight:700;">⚙️ Preferencias (opcional)</div>
-            <form action="/guardar-preferencias-dieta" method="POST" onsubmit="showSpin('GUARDANDO PREFERENCIAS...')">
-                <label style="font-size:.78em;">País / Región</label>
-                <input name="pais" placeholder="Ej: España, México, Colombia..." value="${user.pais || ''}" style="font-size:.85em;margin-bottom:8px;">
+        <!-- PREFERENCIAS COLAPSABLES -->
+        <div style="border:1px solid rgba(0,212,255,0.15);border-radius:10px;margin-bottom:10px;overflow:hidden;">
+            <div onclick="toggleSb('sb-pref-dieta')" style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;cursor:pointer;background:rgba(0,212,255,0.04);">
+                <span style="font-size:.78em;color:var(--accent);letter-spacing:1.5px;text-transform:uppercase;font-weight:700;">⚙️ Preferencias (opcional)</span>
+                <span class="arr" style="color:var(--muted);font-size:.8em;">▼</span>
+            </div>
+            <div id="sb-pref-dieta" style="padding:12px;">
+                <form action="/guardar-preferencias-dieta" method="POST" onsubmit="showSpin('GUARDANDO PREFERENCIAS...')">
+                    <label style="font-size:.78em;">País / Región</label>
+                    <input name="pais" placeholder="Ej: España, México, Colombia..." value="${user.pais || ''}" style="font-size:.85em;margin-bottom:8px;">
 
-                <label style="font-size:.78em;">Presupuesto para comida</label>
-                <select name="nivel_economico" style="font-size:.85em;margin-bottom:8px;">
-                    <option value="">— No especificar —</option>
-                    <option value="Bajo" ${user.nivel_economico === 'Bajo' ? 'selected' : ''}>💰 Ajustado (económico)</option>
-                    <option value="Medio" ${user.nivel_economico === 'Medio' ? 'selected' : ''}>💰💰 Moderado</option>
-                    <option value="Alto" ${user.nivel_economico === 'Alto' ? 'selected' : ''}>💰💰💰 Sin restricción</option>
-                </select>
+                    <label style="font-size:.78em;">Presupuesto para comida</label>
+                    <select name="nivel_economico" style="font-size:.85em;margin-bottom:8px;">
+                        <option value="">— No especificar —</option>
+                        <option value="Bajo" ${user.nivel_economico === 'Bajo' ? 'selected' : ''}>💰 Ajustado (económico)</option>
+                        <option value="Medio" ${user.nivel_economico === 'Medio' ? 'selected' : ''}>💰💰 Moderado</option>
+                        <option value="Alto" ${user.nivel_economico === 'Alto' ? 'selected' : ''}>💰💰💰 Sin restricción</option>
+                    </select>
 
-                <label style="font-size:.78em;">Restricciones alimentarias</label>
-                <select name="restricciones_dieta" style="font-size:.85em;margin-bottom:10px;">
-                    <option value="">— Ninguna —</option>
-                    <option value="Vegetariano" ${user.restricciones_dieta === 'Vegetariano' ? 'selected' : ''}>🥦 Vegetariano</option>
-                    <option value="Vegano" ${user.restricciones_dieta === 'Vegano' ? 'selected' : ''}>🌱 Vegano</option>
-                    <option value="Sin gluten" ${user.restricciones_dieta === 'Sin gluten' ? 'selected' : ''}>🌾 Sin gluten</option>
-                    <option value="Sin lactosa" ${user.restricciones_dieta === 'Sin lactosa' ? 'selected' : ''}>🥛 Sin lactosa</option>
-                    <option value="Halal" ${user.restricciones_dieta === 'Halal' ? 'selected' : ''}>☪️ Halal</option>
-                    <option value="Kosher" ${user.restricciones_dieta === 'Kosher' ? 'selected' : ''}>✡️ Kosher</option>
-                </select>
+                    <label style="font-size:.78em;">Restricciones alimentarias</label>
+                    <select name="restricciones_dieta" style="font-size:.85em;margin-bottom:10px;">
+                        <option value="">— Ninguna —</option>
+                        <option value="Vegetariano" ${user.restricciones_dieta === 'Vegetariano' ? 'selected' : ''}>🥦 Vegetariano</option>
+                        <option value="Vegano" ${user.restricciones_dieta === 'Vegano' ? 'selected' : ''}>🌱 Vegano</option>
+                        <option value="Sin gluten" ${user.restricciones_dieta === 'Sin gluten' ? 'selected' : ''}>🌾 Sin gluten</option>
+                        <option value="Sin lactosa" ${user.restricciones_dieta === 'Sin lactosa' ? 'selected' : ''}>🥛 Sin lactosa</option>
+                        <option value="Halal" ${user.restricciones_dieta === 'Halal' ? 'selected' : ''}>☪️ Halal</option>
+                        <option value="Kosher" ${user.restricciones_dieta === 'Kosher' ? 'selected' : ''}>✡️ Kosher</option>
+                    </select>
 
-                <button type="submit" class="sec" style="font-size:.78em;width:100%;">💾 Guardar preferencias</button>
-            </form>
+                    <button type="submit" class="sec" style="font-size:.78em;width:100%;">💾 Guardar preferencias</button>
+                </form>
+            </div>
         </div>
 
+        <!-- BOTÓN GENERAR -->
         <form action="/regenerar-dieta" method="POST" onsubmit="showSpin('GENERANDO PLAN DE DIETA CON IA...')">
             <button type="submit" class="orange" style="font-size:.82em;">🤖 ${user.dieta_ia ? 'Regenerar dieta' : 'Generar dieta con IA'}</button>
         </form>
+
+        <!-- CONTENIDO GENERADO -->
+        ${user.dieta_ia
+            ? `<div style="font-size:.85em;line-height:1.6;max-height:400px;overflow-y:auto;margin-top:12px;">${user.dieta_ia}</div>`
+            : `<p style="color:var(--muted);font-size:.82em;margin-bottom:10px;margin-top:10px;">Aún no tienes un plan de dieta. Configura tus preferencias arriba y genera uno.</p>`
+        }
     </div>
 </div>
-
-            <!-- CERRAR SESIÓN -->
-            <form action="/logout" method="POST" style="margin-top:8px;">
-                <button type="submit" class="red">🚪 Cerrar Sesión</button>
-            </form>
-
-        </div>
-    </div>
 
     <!-- TOPBAR -->
     <div class="topbar">
@@ -2295,9 +2297,9 @@ u.onerror = () => { fidx++; if (hablando) hablar(); };
             return;
         }
         const isFem = !!document.getElementById('mouthF');
-        const open  = isFem ? 'M69 79 Q80 90 91 79' : 'M68 82 Q80 92 92 82';
-        const mid   = isFem ? 'M69 79 Q80 86 91 79' : 'M68 82 Q80 88 92 82';
-        const close2 = isFem ? 'M70 80 Q80 84 90 80' : 'M69 83 Q80 86 91 83';
+        const open  = isFem ? 'M69 108 Q80 118 91 108' : 'M68 108 Q80 120 92 108';
+const mid   = isFem ? 'M69 108 Q80 114 91 108' : 'M68 108 Q80 116 92 108';
+const close2 = isFem ? 'M70 109 Q80 112 90 109' : 'M69 109 Q80 112 91 109';
         const shapes = [open, mid, close2, mid, open, close2, mid, open];
         let si = 0;
         mouthInterval = setInterval(() => {
@@ -2531,10 +2533,17 @@ u.onerror = () => { fidx++; if (hablando) hablar(); };
     actualizarDisplay(sugerido * 60);
 // ── MÓVIL: mostrar iconos en topbar ───────────────────────────
 if (window.innerWidth <= 768) {
-    document.getElementById('btnCronoTopbar').style.display = 'flex';
-    document.getElementById('btnAvatarTopbar').style.display = 'flex';
-    // Saludo automático al entrar
-    setTimeout(() => cerrarAvatarGreeting(), 5000);
+    const btnC = document.getElementById('btnCronoTopbar');
+    const btnA = document.getElementById('btnAvatarTopbar');
+    if (btnC) btnC.style.display = 'flex';
+    if (btnA) btnA.style.display = 'flex';
+    // Saludo automático: mostrar y cerrar a los 5 segundos
+    const greet = document.getElementById('avatarGreeting');
+    if (greet) {
+        greet.style.display = 'flex';
+        greet.classList.remove('hidden');
+        setTimeout(() => cerrarAvatarGreeting(), 5000);
+    }
 }
 
 // ── MODAL CRONÓMETRO MÓVIL ─────────────────────────────────────
@@ -2597,8 +2606,17 @@ function cerrarAvatarGreeting() {
     document.getElementById('avatarGreeting').classList.add('hidden');
 }
 function abrirAvatarGreeting() {
-    document.getElementById('avatarGreeting').classList.remove('hidden');
+    const el = document.getElementById('avatarGreeting');
+    if (!el) return;
+    el.classList.remove('hidden');
+    el.style.display = 'flex';
     setTimeout(() => cerrarAvatarGreeting(), 6000);
+}
+
+function cerrarAvatarGreeting() {
+    const el = document.getElementById('avatarGreeting');
+    if (!el) return;
+    el.classList.add('hidden');
 }
     // ── GRÁFICA DE PESO ────────────────────────────────────────
     const histData = JSON.parse(document.getElementById('_histData').textContent);
