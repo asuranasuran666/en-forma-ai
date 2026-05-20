@@ -1775,8 +1775,10 @@ const minutosSugeridos = {'Perder PESO':60,'Ganar MÚSCULO':60,'Mejorar RESISTEN
             ? `<div style="font-size:.85em;line-height:1.6;max-height:400px;overflow-y:auto;margin-top:12px;">${user.dieta_ia}</div>`
             : `<p style="color:var(--muted);font-size:.82em;margin-bottom:10px;margin-top:10px;">Aún no tienes un plan de dieta. Configura tus preferencias arriba y genera uno.</p>`
         }
-    </div>
+                </div>
             </div>
+        </div>
+    </div>
 
     <!-- TOPBAR -->
     <div class="topbar">
