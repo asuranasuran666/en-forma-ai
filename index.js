@@ -1724,11 +1724,11 @@ const minutosSugeridos = {'Perder PESO':60,'Ganar MÚSCULO':60,'Mejorar RESISTEN
             </div>
 
             <!-- DIETA -->
-<div class="sb-section">
-    <div class="sb-section-h" onclick="toggleSb('sb-dieta')">
-        🥗 DIETA Y RECOMENDACIONES <span>▼</span>
-    </div>
-    <div class="sb-section-b" id="sb-dieta">
+            <div class="sb-section">
+                <div class="sb-section-h" onclick="toggleSb('sb-dieta')">
+                    🥗 DIETA Y RECOMENDACIONES <span>▼</span>
+                </div>
+                <div class="sb-section-b" id="sb-dieta">
 
         <!-- PREFERENCIAS COLAPSABLES -->
         <div style="border:1px solid rgba(0,212,255,0.15);border-radius:10px;margin-bottom:10px;overflow:hidden;">
@@ -1776,7 +1776,7 @@ const minutosSugeridos = {'Perder PESO':60,'Ganar MÚSCULO':60,'Mejorar RESISTEN
             : `<p style="color:var(--muted);font-size:.82em;margin-bottom:10px;margin-top:10px;">Aún no tienes un plan de dieta. Configura tus preferencias arriba y genera uno.</p>`
         }
     </div>
-</div>
+            </div>
 
     <!-- TOPBAR -->
     <div class="topbar">
