@@ -2603,7 +2603,9 @@ function cronoReset2() {
 
 // ── AVATAR SALUDO MÓVIL ────────────────────────────────────────
 function cerrarAvatarGreeting() {
-    document.getElementById('avatarGreeting').classList.add('hidden');
+    const el = document.getElementById('avatarGreeting');
+    if (!el) return;
+    el.classList.add('hidden');
 }
 function abrirAvatarGreeting() {
     const el = document.getElementById('avatarGreeting');
@@ -2611,12 +2613,6 @@ function abrirAvatarGreeting() {
     el.classList.remove('hidden');
     el.style.display = 'flex';
     setTimeout(() => cerrarAvatarGreeting(), 6000);
-}
-
-function cerrarAvatarGreeting() {
-    const el = document.getElementById('avatarGreeting');
-    if (!el) return;
-    el.classList.add('hidden');
 }
     // ── GRÁFICA DE PESO ────────────────────────────────────────
     const histData = JSON.parse(document.getElementById('_histData').textContent);
