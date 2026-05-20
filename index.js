@@ -2608,12 +2608,13 @@ function cerrarAvatarGreeting() {
     const el = document.getElementById('avatarGreeting');
     if (!el) return;
     el.classList.add('hidden');
+    el.style.transform = '';
 }
 function abrirAvatarGreeting() {
     const el = document.getElementById('avatarGreeting');
     if (!el) return;
     el.classList.remove('hidden');
-    el.style.display = 'flex';
+    el.style.transform = 'translateY(0)';
     setTimeout(() => cerrarAvatarGreeting(), 6000);
 }
     // ── GRÁFICA DE PESO ────────────────────────────────────────
